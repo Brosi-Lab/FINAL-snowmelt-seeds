@@ -27,6 +27,9 @@ We hypothesize that earlier snowmelt date could affect plant seed set through ad
 
 ```{r packages, message = F, results = F, warning = F}
 
+# clear environment:
+rm(list = ls())
+
 # create a list of needed packages:
 # (ADD / delete the packages you need / don't below!)
 Packages <- c("tidyverse", "knitr", "kableExtra", "glmmTMB", "fitdistrplus", 
@@ -43,10 +46,15 @@ lapply(Packages, library, character.only = TRUE)
 # suppress redundant messages from dplyr about group-level summarizing:
 options(dplyr.summarise.inform = FALSE)
 
-# cleanup
-rm(Packages)
+# format package list for printing below:
+Packages <- paste(Packages, sep = ", ")
 
 ```
+
+Packages used:
+
+`r Packages`
+
 
 # Data
 
@@ -63,9 +71,7 @@ three datasets to import:
     + data on how many weeks the flowering phenology in the snowmelt-accelerated plot was advanced relative to the control
     + all control plots have a zero (acceleration is relative to this)
 
-```{r Environment and Packages}
-
-rm(list = ls()) # clear environment
+```{r data import}
 
 # seed data raw
 masterdat = read.csv("data/Masterseed2019.csv", stringsAsFactors = F, header=T)
@@ -73,6 +79,9 @@ masterdat = read.csv("data/Masterseed2019.csv", stringsAsFactors = F, header=T)
 snowmeltdat = read.csv("data/regressionmeltdays.csv", header = T)
 # species-plot level phenological shift
 phenoshift = read.csv("data/phenoshifted.csv", stringsAsFactors = F, header=T)
+
+# clean up `Packages` list (doing it here because had to print above):
+rm(Packages)
 
 ```
 
@@ -567,8 +576,8 @@ Assess model residuals to see if the model meets basic statistical assumptions, 
 # "simoutcommfec" = simulation output, community fecundity models 
 simoutcommfec <- simulateResiduals(fittedModel = comm.fec.3, plot = F)
 plot(simoutcommfec)
-testDispersion(simoutcommfec)
-testZeroInflation(simoutcommfec)
+testDispersion(simoutcommfec, plot = F)
+testZeroInflation(simoutcommfec, plot = F)
 
 # cleanup
 # rm(simoutcommfec, comm.fec.3)
@@ -829,8 +838,8 @@ Assess model residuals to see if the model meets basic statistical assumptions, 
 simoutpolllim <- simulateResiduals(fittedModel = poll.limit.mod, plot = F)
 cat("\n model with 2- and 3-way interactions (doesn't include flower number)\n")
 plot(simoutpolllim)
-testDispersion(simoutpolllim)
-testZeroInflation(simoutpolllim)
+testDispersion(simoutpolllim, plot = F)
+testZeroInflation(simoutpolllim, plot = F)
 ```
 
 Looks good! Carry on... 
@@ -844,9 +853,12 @@ simoutpolllim24 <- simulateResiduals(fittedModel = poll.limit.mod24, plot = F)
 cat("\n model with 2- and 4-way interactions (does include flower number)\n")
 plot(simoutpolllim24)
 
+testDispersion(simoutpolllim24, plot = F)
+testZeroInflation(simoutpolllim24, plot = F)
+
 # # cleanup
-# rm(simoutpolllim, simoutpolllim24, poll.limit.mod, 
-#    poll.limit.mod24, aov.poll.limit.mod)
+rm(simoutpolllim, simoutpolllim24, poll.limit.mod, 
+    poll.limit.mod24, aov.poll.limit.mod)
 
 ```
 

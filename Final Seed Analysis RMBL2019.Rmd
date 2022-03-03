@@ -30,16 +30,17 @@ We hypothesize that earlier snowmelt date could affect plant seed set through ad
 # create a list of needed packages:
 # (ADD / delete the packages you need / don't below!)
 Packages <- c("tidyverse", "knitr", "kableExtra", "glmmTMB", "fitdistrplus", 
-              "reshape2", "vegan", "car", "ggpubr", "broom.mixed", "mclogit", "DHARMa") 
+              "reshape2", "vegan", "car", "ggpubr", "broom.mixed", "mclogit", 
+              "DHARMa") 
 
-# this next line checks to see if all of the packages are installed
-# if not, it installs them; note `installed.packages()` can be a little slow
+# # this next line checks to see if all of the packages are installed
+# # if not, it installs them; note `installed.packages()` can be a little slow
 # install.packages(setdiff(Packages, rownames(installed.packages())), repos = "http://cran.us.r-project.org")
 
-# this line then loads all of the packages:
+# this line loads all of the packages:
 lapply(Packages, library, character.only = TRUE)
 
-# suppress silly messages from dplyr about group-level summarizing:
+# suppress redundant messages from dplyr about group-level summarizing:
 options(dplyr.summarise.inform = FALSE)
 
 # cleanup
@@ -60,18 +61,18 @@ three datasets to import:
 * flowering phenology data
     + one data point per plot-species combination; 116 rows
     + data on how many weeks the flowering phenology in the snowmelt-accelerated plot was advanced relative to the control
-    + all control plots have a zero
+    + all control plots have a zero (acceleration is relative to this)
 
 ```{r Environment and Packages}
 
 rm(list = ls()) # clear environment
 
 # seed data raw
-masterdat = read.csv("Masterseed2019.csv", stringsAsFactors = F, header=T)
+masterdat = read.csv("data/Masterseed2019.csv", stringsAsFactors = F, header=T)
 # snowmelt dates data raw
-snowmeltdat = read.csv("regressionmeltdays.csv", header = T)
+snowmeltdat = read.csv("data/regressionmeltdays.csv", header = T)
 # species-plot level phenological shift
-phenoshift = read.csv("phenoshifted.csv", stringsAsFactors = F, header=T)
+phenoshift = read.csv("data/phenoshifted.csv", stringsAsFactors = F, header=T)
 
 ```
 
@@ -539,7 +540,7 @@ Anova(comm.fec.3)
 ## use `broom.mixed` package to save model summary as a table
 aov.comm.fec = Anova(comm.fec.3)
 out.aov.comm.fec = tidy(aov.comm.fec)
-# write.csv(out.aov.comm.fec, file = "community-fecundity-model-results.csv")
+write.csv(out.aov.comm.fec, file = "results/community-fecundity-model-results.csv")
 
 # cleanup
 # don't cleanup `comm.fec.3` since we need to assess model assumptions
@@ -772,7 +773,10 @@ Finally, following initial model assessment with `DHARMa` we included a zero-inf
 
 ```{r models of community-wide pollen limitation}
 
-# these models were tricky to specify syntactically...
+# these models were tricky to specify syntactically... remember:
+# - "*" specifies an interaction and both associated main effects
+# - "/" specifies an interaction and main effect only on the left
+# - ":" specifies the interaction without any main effects
 
 # model with 2- and 3-way interactions (doesn't include flower number):
 poll.limit.mod = glmmTMB(totalseeds ~ (plant.treat:phenshift.binary)/species + 
@@ -795,7 +799,7 @@ Anova(poll.limit.mod24)
 # saving first model (2- & 3- way interactions only)
 aov.poll.limit.mod = Anova(poll.limit.mod)
 aov.poll.limit.mod = tidy(aov.poll.limit.mod)
-write.csv(aov.poll.limit.mod, file = "community-pollen-limitation-model-results.csv")
+write.csv(aov.poll.limit.mod, file = "results/community-pollen-limitation-model-results.csv")
 
 # don't cleanup / remove models just yet, need to do assessment on them first
 
@@ -803,10 +807,8 @@ write.csv(aov.poll.limit.mod, file = "community-pollen-limitation-model-results.
 
 in a nutshell:
 
-* 2-way interaction indicates an overall effect of pollen limitation and phenological advancement
+* 2-way interaction indicates a significant overall effect of pollen limitation and phenological advancement
     + plot (next code chunk) suggests *greater* pollen limitation (i.e. more negative) under phenological advancement
-    + highly significant ($p$ = 1.811e-08) when assessed in conjunction with the 3-way interaction
-    + significant ($p$ = 0.01985) when assessed with the 4-way interaction
 * 3-way interaction highly significant: this indicates that pollen limitation is different when plants are phenologically shifted vs. not (taking into account plant species)
     + restated, this means that pollen limitation is different depending on whether or not plants were phenologically advanced in different plant species
     + plots are consistent with the idea that directionality of the effect is different depending on species

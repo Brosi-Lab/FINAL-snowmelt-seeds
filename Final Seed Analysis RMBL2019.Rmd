@@ -14,9 +14,7 @@ output:
 
 # Overview
 
-In this analysis, we assess if the timing of snowmelt impacts seed set in montane plant communities, with a plant-community-level focus. We conducted an accelerated snowmelt experiment at RMBL, Colorado in summer 2019. We worked at 8 sites scattered across 2 valleys. In each site, we had paired control-manip plots, each 14 x 10 m. In manip plots, we accelerated snowmelt by solarizing the snow with black shade cloth. Snowmelt rate in control plots was unmanipulated. For the most part, accelerating snowmelt caused plant phenology to begin earlier in manipulated plots. 
-
-We hypothesize that earlier snowmelt date could affect plant seed set through advances in flowering time that potentiate plant-pollinator phenology mismatches.
+In this analysis, we assess if the timing of snowmelt impacts seed set in montane plant communities, with a plant-community-level focus. We conducted an accelerated snowmelt experiment at RMBL, Colorado in summer 2019. We worked at 8 sites scattered across 2 valleys. In each site, we had paired control and snowmelt acceleration plots, each 14 x 10 m (thus there were 16 plots total). We accelerated snowmelt by solarizing the snow with black shade cloth, which was removed just before snow melted to ground level. Snowmelt rate in control plots was unmanipulated. In many plant species, accelerating snowmelt caused earlier plant flowering relative to controls. We hypothesize that earlier snowmelt date could affect plant seed set through advances in flowering time that potentiate plant-pollinator phenology mismatches.
 
 ## TO-DOs
 
@@ -591,8 +589,6 @@ Looks great! No issues with distribution of residuals, dispersion, or zero-infla
 #### plot main effect of phenology shift on fecundity
 
 First, aggregate data to mean per-plant fecundity in each of phenologically accelerated and control plants. We have narrowed the data down to plant species - site combinations in which the plants in the snowmelt acceleration plots were actually phenologically accelerated relative to the controls, and for which there were at least 5 individuals for which fecundity was measured in both control and phenologically accelerated groups.
-
-include confidence intervals
 
 ```{r phenology main effect fecundity plot, message = FALSE}
 

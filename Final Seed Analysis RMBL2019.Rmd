@@ -1,0 +1,1018 @@
+---
+title: "Snowmelt Seed Analysis RMBL 2019"
+author: "Loy Xingwen and Berry Brosi"
+date: "started 18/12/2020, most recent updates `r format(Sys.time(), '%d %B %Y')`"
+output:
+  html_document:
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    number_sections: true
+    code_folding: hide
+    theme: cosmo
+---
+
+# Overview
+
+In this analysis, we assess if the timing of snowmelt impacts seed set in montane plant communities, with a plant-community-level focus. We conducted an accelerated snowmelt experiment at RMBL, Colorado in summer 2019. We worked at 8 sites scattered across 2 valleys. In each site, we had paired control-manip plots, each 14 x 10 m. In manip plots, we accelerated snowmelt by solarizing the snow with black shade cloth. Snowmelt rate in control plots was unmanipulated. For the most part, accelerating snowmelt caused plant phenology to begin earlier in manipulated plots. 
+
+We hypothesize that earlier snowmelt date could affect plant seed set through advances in flowering time that potentiate plant-pollinator phenology mismatches.
+
+## TO-DOs
+
+> stitch figures together; particularly figs 1a & 1b (overall snowmelt date and phenology acceleration by site)
+
+
+## Package Installation
+
+```{r packages, message = F, results = F, warning = F}
+
+# create a list of needed packages:
+# (ADD / delete the packages you need / don't below!)
+Packages <- c("tidyverse", "knitr", "kableExtra", "glmmTMB", "fitdistrplus", 
+              "reshape2", "vegan", "car", "ggpubr", "broom.mixed", "mclogit", "DHARMa") 
+
+# this next line checks to see if all of the packages are installed
+# if not, it installs them; note `installed.packages()` can be a little slow
+# install.packages(setdiff(Packages, rownames(installed.packages())), repos = "http://cran.us.r-project.org")
+
+# this line then loads all of the packages:
+lapply(Packages, library, character.only = TRUE)
+
+# suppress silly messages from dplyr about group-level summarizing:
+options(dplyr.summarise.inform = FALSE)
+
+# cleanup
+rm(Packages)
+
+```
+
+# Data
+
+## Data import
+
+three datasets to import:
+
+* seed data
+    + most of the relevant data are included in here; 1155 rows in the original dataset
+* snowmelt data
+    + one data point per plot (16 plots, 8 sites each with a control and a snowmelt acceleration plot); data for Julian day on which meltout occurred and acceleration of the snowmelt plot relative to the control
+* flowering phenology data
+    + one data point per plot-species combination; 116 rows
+    + data on how many weeks the flowering phenology in the snowmelt-accelerated plot was advanced relative to the control
+    + all control plots have a zero
+
+```{r Environment and Packages}
+
+rm(list = ls()) # clear environment
+
+# seed data raw
+masterdat = read.csv("Masterseed2019.csv", stringsAsFactors = F, header=T)
+# snowmelt dates data raw
+snowmeltdat = read.csv("regressionmeltdays.csv", header = T)
+# species-plot level phenological shift
+phenoshift = read.csv("phenoshifted.csv", stringsAsFactors = F, header=T)
+
+```
+
+## Data formatting
+
+The basic plan is to set up the seed data (`masterdat`) as the primary dataset used, and to merge the snowmelt and phenology data into the seed data frame. A fair amount of miscellaneous data cleaning and formatting has to be conducted first.
+
+### miscellaneous data formatting
+
+among other things:
+
+* change experimental state from "manip" (i.e. manipulated) to "accel" (i.e. snowmelt accelerated) for clarity throughout
+* set up species name abbreviations
+* assignment of columns as factors
+* renaming "treat" column to "plant.treat"
+* creating a self-compatibility column
+* removing rows without flower number
+* change site name from "Pfieler" (incorrect) to "Pfeiler" (correct)
+* prepping data for merges (creating ID columns aggregated at various levels)
+
+```{r miscellaneous data formatting}
+
+# ===============
+# site name ("Pfieler" to "Pfeiler")
+
+# masterdat
+masterdat$site = str_replace(masterdat$site, "Pfieler", "Pfeiler")
+# snowmeltdat
+snowmeltdat$site = str_replace(snowmeltdat$site, "Pfieler", "Pfeiler")
+# phenoshift
+phenoshift$site.plot.sp = str_replace(phenoshift$site.plot.sp, "Pfieler", "Pfeiler")
+
+# ===============
+# experimental state ("manip" to "accel")
+
+# masterdat
+masterdat$plot.treat = str_replace(masterdat$plot.treat, "manip", "accel")
+# snowmeltdat
+snowmeltdat$plot.treat = str_replace(snowmeltdat$plot.treat, "manip", "accel")
+# phenoshift
+phenoshift$site.plot.sp = str_replace(phenoshift$site.plot.sp, "manip", "accel")
+
+# ===============
+# species names
+
+# abbreviate species names - M. fusiformis
+masterdat$g.species = paste(substr(masterdat$species, 1, 1), sub("^[^ ]*", ".", masterdat$species), sep = "")
+
+# abbreviate species names - Genus only
+masterdat$genus = gsub( " .*$", "", masterdat$species)
+
+# abbreviate species names - first two letters of genus and species 
+masterdat$ge.sp = paste(substr(masterdat$species, 1, 2), substr(sub("^\\S+\\s+", '', masterdat$species), 1, 2), sep = "")
+
+# ===============
+# seed data
+
+# Change NAs to 0; we have removed cases where both columns say NA, which is when we lost a plant.
+masterdat$dev.seed1[is.na(masterdat$dev.seed1)] <- 0
+masterdat$dev.seed[is.na(masterdat$dev.seed)] <- 0
+
+# create column for total seed counts
+masterdat$totalseeds = masterdat$dev.seed1 + masterdat$dev.seed
+
+# ===============
+# miscellaneous cleanup and formatting
+
+# rename the full `species` column
+names(masterdat)[names(masterdat) == "species"] <- "full.species"
+
+# rename the ge.sp column to simply 'species'
+names(masterdat)[names(masterdat) == "ge.sp"] <- "species"
+
+# remove exclusion treatment plants
+masterdat = subset(masterdat, masterdat$treat != "exclusion")  
+
+# factors
+masterdat$site = factor(masterdat$site)
+masterdat$plot.treat = factor(masterdat$plot.treat)
+masterdat$species = factor(masterdat$species)
+
+# remove rows that have no 'number of flowers'
+masterdat = masterdat[!is.na(masterdat$num.flowers),]
+
+# variables to factors
+masterdat$site = factor(masterdat$site)
+masterdat$plot.treat = factor(masterdat$plot.treat)
+masterdat$species = factor(masterdat$species)
+
+# rename hand pollination treatment variable
+# to disambiguate it from the plot treatment variable
+names(masterdat)[names(masterdat) == "treat"] <- "plant.treat"
+
+# create column of whether plant species is self compatible or not
+masterdat$selfer = 'F'
+masterdat$selfer[masterdat$species == "Thfe"] = 'T'
+masterdat$selfer[masterdat$species == "Bost"] = 'T'
+masterdat$selfer[masterdat$species == "Taof"] = 'T'
+masterdat$selfer[masterdat$species == "Rain"] = 'T'
+
+# log transform the seed set for future plotting
+masterdat$logseed = log(masterdat$totalseeds + 1)
+
+# ===============
+# prep for merging
+
+# unique ID for each plot
+masterdat$plotID = paste(masterdat$site.abbrev, masterdat$plot.orient, sep=".")
+
+# ID for individual plants
+masterdat$plantID = paste(masterdat$site, masterdat$plot.treat, masterdat$species, masterdat$quad, masterdat$grid, masterdat$plant.treat, sep = ".")
+
+```
+
+
+### merge seed and meltout data
+
+for this merge, we need to create a unique ID for both `masterdat` and `snowmeltdat` that includes both the site and the plot within the site (snowmelt acceleration vs. control). We don't drop the snowmelt dataframe after the merge, as we use it down the road in plotting overall snowmelt trends.
+
+```{r Merging snowmelt day with seed data}
+
+# create unique ID in snowmelt data
+snowmeltdat$meltID = paste(snowmeltdat$site, snowmeltdat$plot.treat, sep = ".")
+
+# create unique ID for snowmelt in seed data
+masterdat$meltID = paste(masterdat$site, masterdat$plot.treat, sep = ".")
+
+# drop extra columns in snowmelt data
+drops <- c("site","plot.treat")
+snowmelttemp = snowmeltdat[ , !(names(snowmeltdat) %in% drops)]
+
+# merge
+masterdat <- merge(masterdat, snowmelttemp, by="meltID")
+rm(drops, snowmelttemp) #cleanup
+
+```
+
+### merge phenology data into seed data
+
+Similar to the above, we create an individual ID for `masterdat` for species within plots within sites (this already exists for the `phenoshift` data). Once we have merged the phenology data into the seed data, we remove that dataframe for clarity and workspace cleanliness as it is not used downstream.
+
+```{r merge phenology data with seed data}
+
+# create ID for plots
+masterdat$site.plot = paste(masterdat$site, masterdat$plot.treat, sep=".")
+
+# create unique identifier for species-plot
+masterdat$site.plot.sp = paste(masterdat$site, masterdat$plot.treat, masterdat$species, sep=".")
+
+# merge species-plot phenological shift data with seed data
+masterdat = left_join(masterdat, phenoshift, by = "site.plot.sp")
+
+# set up binary phenological shift variable, 'phenshift.binary':
+masterdat$phenshift.binary="no"
+masterdat$phenshift.binary[masterdat$phenshift>0]="yes"
+
+# cleanup
+rm(phenoshift)
+```
+
+### post-merge formatting
+
+dropping extraneous columns from `masterdat`; converting phenology shift to negative (since it is earlier relative to controls)
+
+```{r post-merge formatting}
+
+# select only needed columns 
+myvars = c("site", "site.abbrev", "plot.treat", "site.plot", "species", 
+          "full.species", "plant.treat", "num.flowers", "totalseeds", 
+          "phenshift", "phenshift.binary")
+
+masterdat = masterdat[myvars]
+rm(myvars) # cleanup
+
+# make phenological shift data negative
+# (earlier relative to control)
+masterdat$phenshift = masterdat$phenshift*(-1)
+
+```
+
+# Analysis
+
+there are three primary classes of analyses, all at a community level:
+
+* overall fecundity
+    + assesses how phenological shifts (driven by our experimental snowmelt acceleration) impact overall seed production
+* pollen limitation
+    + assesses the extent to which changes in fecundity were driven by pollen limitation (as opposed to resource limitation)
+* relative proportions of seed output
+    + even if community-level fecundity changes, we want to know the potential for reshaping plant communities; this analysis assesses if the relative proportions of seed produced change in control vs. snowmelt acceleration plots (in the same site)
+
+## Preliminaries
+
+Analysis preliminaries include: 
+
+* simple calculations that give an overview of the data
+* basic probability distribution choice for the seed data
+* plot of efficacy of snowmelt manipulations
+* plot of overall phenological shift by site
+
+### Data overview
+
+```{r data overview}
+
+# most of this is just displayed in the text below
+
+# Number of plants
+# * `r nrow(masterdat)` plants
+
+# Number of plants per treatment
+plants.per.treat = masterdat %>% group_by(plot.treat) %>%
+  summarise(no_rows = length(plot.treat))
+    # + `r as.numeric(plants.per.treat[2,2])` plants in control plots
+    # + `r as.numeric(plants.per.treat[1,2])` plants in snowmelt-accelerated plots
+
+# Total number of seeds
+# * `r as.integer(sum(masterdat$totalseeds))` total seeds
+# "as.integer" makes it so that it does not display in scientific notation
+
+```
+
+Overall, we measured:
+
+* `r nrow(masterdat)` plants
+    + `r as.numeric(plants.per.treat[2,2])` plants in control plots
+    + `r as.numeric(plants.per.treat[1,2])` plants in snowmelt-accelerated plots
+* `r as.integer(sum(masterdat$totalseeds))` total seeds
+
+These totals come after substantial data cleaning and as such do not include bagged plants, etc. At the same time, however, for subsequent analyses these data are further reduced, for example excluding hand-pollinated plants in all but the pollen limitation analyses, plant species that did not occur in at least three sites, etc.
+
+### Distribution choice for seed data
+
+Before we fit any models, we want to see how the response variable (seed count) is distributed. It is a discrete count variable; in past data analyses, seed counts have been overdispersed and fit much better with a negative binomial distribution than with a Poisson, but worth a quick check.
+
+```{r Distribution fitting}
+
+# assess distribution of the response variable
+isitgonnabepois <- fitdist(masterdat$totalseeds,"pois")
+isitgonnabenbinom <- fitdist(masterdat$totalseeds,"nbinom")
+
+# plot them:
+cat("Poisson:\n") # this just prints the title before the plot
+plot(isitgonnabepois)
+cat("Negative Binomial:\n") # again, printing the title before the plot
+plot(isitgonnabenbinom) # negative bionmial is the one!
+
+# cleanup, including `plants.per.treat` from previous code chunk
+rm(isitgonnabenbinom, isitgonnabepois, plants.per.treat) 
+
+```
+
+The seed data generally fit a negative binomial distribution much better than a Poisson (no surprise). We will also assess overdispersion when actually running models.
+
+
+### Plots of overall snowmelt and phenology
+
+#### Snowmelt plot
+
+Here's a plot of the Julian days that the snowmelt-accelerated plots melted out, with sites sorted by magnitude of snowmelt acceleration:
+
+```{r Plot meltout dates by plot, eval = T, echo = FALSE}
+
+snowmeltdat$sitesort = factor(snowmeltdat$site, levels=c("Pfeiler",
+         'BellviewBench',
+         '403Bench',
+         "RustlersGulch",
+         "Meridian",
+         'AveryPicnic',
+         "WG3C",
+         "StupidFalls"
+         ))
+
+# Plot
+plotsnow = ggplot(snowmeltdat, aes(y=sitesort, x=meltday, group = site, color = plot.treat)) + 
+  geom_point(size = 4) +
+  geom_line(color = "black") +
+  theme_light() +
+  xlab("meltout day of year") + ylab("sites") +
+  theme(axis.title.y = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black")) +
+  scale_colour_manual(values=c("orangered3", "darkslategray2"))
+
+plotsnow
+#ggsave(plot = plotsnow, width = 6, height = 3, dpi = 300, filename = "plotsnow.pdf")
+
+# cleanup
+# includes removing entire `snowmeltdat` dataframe, not used again
+# rm(plotsnow, snowmeltdat) 
+
+```
+
+#### Phenology plot
+
+While it would seem natural to use the `phenoshift` dataset here, which is already aggregated by site, plot, and species (not `masterdat`), the issue is that some of the species in `phenoshift` were assessed for phenology but did not ultimately have fecundity measured (either at all, or within some of the plots). At the same time, post-merge the phenology data are pseudoreplicated in `masterdat` (i.e. recorded on each line, but actually only measured at the species-by-plot level). To get rid of the pseudoreplication issue, conduct a two-stage summarization of the `masterdat` data. First, calculate the per-species, per-site mean phenology shift; for any given species, the numbers are all the same (again because they were filled in by the merge). Second, once the data have been aggregated to the site-by-species level, *then* take the mean again to calculate the true per-site mean; at this point we can also calculate standard deviations and thus confidence intervals.
+
+```{r Phenology plot, warning = FALSE}
+
+# first aggregation (get rid of pseudoreplication)
+meansbysite = masterdat %>% filter(plot.treat == "accel") %>% 
+  group_by(site, species) %>% summarise(speciesmean = mean(phenshift, na.rm = T))
+
+# get rid of NAs (2 site-by-species combos only have NAs)
+meansbysite = meansbysite %>% filter(!(is.na(speciesmean)))
+
+# second aggregation (actually calculate by-site means)
+meansbysite = meansbysite %>% group_by(site) %>% 
+  summarize(mean = mean(speciesmean), std = sd(speciesmean), n = n()) %>%
+    mutate(upper = mean + 1.96*(std/sqrt(n)), lower = mean - 1.96*(std/sqrt(n)))
+
+# relevel in melt-out order:
+meansbysite$site <- factor(meansbysite$site, levels = c("Pfeiler", "BellviewBench", "403Bench", "RustlersGulch", "Meridian","AveryPicnic", "WG3C", "StupidFalls"))
+
+# plot
+meanplotbysite <- ggplot(meansbysite, aes(x=mean, y=site)) + 
+      geom_vline(xintercept = 0,  color = "gray60", size = 1.5) +
+  geom_point(size = 4, shape = 19, color = "orangered3") +
+  geom_errorbarh(aes(xmin = lower, xmax = upper), height = .4) +
+  ylab("") +
+  xlab("phenological shift relative to control (weeks)") +
+  theme_light()
+
+# additional plot formatting
+meanplotbysite = meanplotbysite + theme(
+  axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+  axis.ticks = element_blank())
+
+# display plot
+meanplotbysite
+
+# # save plot: (keep this commented out to prevent repeated saving on GitHub)
+# meanplotbysite = ggsave("meanphenoshiftplot.png", width = 5, height = 3)
+
+# cleanup
+# includes removing `phenoshift` dataset, not used again
+rm(phenoshift, meanplotbysite, meansbysite)
+
+```
+
+## Community Fecundity
+
+The idea here is to see how accelerating flowering phenology impacts plant fecundity across the community. Thus, we are including all species into a single model. We are using **whole-plant fecundity** as a response variable, since phenological shifts could have led to differences in resource availability that could have shifted the total number of flowers and/or ovules within flowers. 
+
+The key explanatory variable is `phenshift.binary`, or whether or not a plant accelerated its flowering in response to our manipulations. Thus, we are including data for cases in which there was accelerated flowering, to assess whether or not those impacted (whole-plant) fecundity. The models are set up to assess not just overall impacts but to also inform us if different species react differently to the manipulation, which is also key at the community level. Thus, the models include plant species and number of flowers as explanatory variables.
+
+Our philosophical approach to the models:
+
+* ultimately we have a complex statistical model and really don't have that many degrees of freedom to play with (6 sites at which plants accelerated blooming relative to controls)
+    + initial attempts at something close to a full model---with all possible interactions between the three explanatory variables---did not converge, which is unsurprising given the degrees of freedom and the substantial variation in the data
+* focus on the *simplest possible model that gets at what we want to understand*, despite the complexity
+    + we know that phenological shifts are going to have different effects on different species; so there has to be an interaction there (`phenshift.binary` $\times$ `species`)
+    + we know that flower number matters for seed count, and that the relationship between flower number and seed count is different for different species (so also have to have a `species` $\times$ `num.flower` interaction)
+    + BUT ultimately in our model we don't want to waste degrees of freedom assessing the main effects of species (of course species have different seed counts) or flower number (of course more flowers means more seeds)---we would want to include if we had a ton of data, but these would be the first to go if model doesn't converge
+    + if we can assess a main effect of phenological shift, that would be ideal
+    + approach: start with the absolute simplest model that gets at what we want---a model including *only* the three-way interaction (`phenshift.binary:species:num.flowers`)
+    + if this converges, subsequently add the main effect of phenological shift (this would tell us if there is an overall effect of phenological shift on seed production)
+    + if that works, then also include a two-way interaction between phenological shift and plant species (this would inform us specifically that different species respond differently to phenological acceleration, irrespective of flower number)
+
+### data prep community fecundity 
+
+* use phenology shift yes/no (`phenshift.binary`) as the explanatory variable
+    + `phenshift` (continuous) is a problematic predictor... temporal coarseness (weekly assessment) means that values range from just 0 to 3
+    + moreover, low # of observations at larger phenological shifts (2 and 3 weeks)
+    + e.g., 449 observations with a phenshift of 0; but only 15 observations for phenshift = 3 and 45 for phenshift = 2
+    + in addition, yes/no is easier to fit statistically than a line among four points, wihch is important for these complex models in which convergence could be an issue
+* for improved model convergence, drop species for which there are observations at fewer than 3 sites
+    + especially Hyca and Getr: only one site, and for Hyca no phenological shift
+    + but also Frvi, Vipr, and Thfe, each only present in two sites
+    + **dropping these species led to model convergence, in models that didn't converge previously**
+* also checked to see if there were species for which there was no binary phenological shift in any site:
+    + there are (Hyca and Thfe), but these were already removed in the step above
+* drop any sites as necessary that no longer have species representation following the above
+    + BellviewBench and 403Bench: no species were phenologically accelerated
+* finally, to be able to make comparisons at the community level, want to only include site-species pairs in which we have both phenologically accelerated plants (in the snowmelt manipulation plot) and unaccelerated plants (in the control plots) in the same sites 
+
+```{r data prep community fecundity}
+
+# subset data to those relevant for the community-level analyses
+# "reddat" = "reduced data"; includes all data (including hand-pollinated),
+# then do "commfecdat" = "community fecundity data" for the data used for this
+# analysis, specifically **not including hand-pollinated flowers**
+reddat = masterdat
+
+# remove species present at fewer than three sites
+spp.list = c("Getr", "Hyca", "Frvi", "Thfe", "Vipr")
+reddat = reddat %>% filter(!(species %in% spp.list))
+
+# following the above, we also need to drop 2 sites, BBB and 403,
+# because none of the species there responded to the snowmelt treatment
+# one way to show this is:
+# table(reddat$site, reddat$phenshift.binary)
+site.list = c("BellviewBench", "403Bench")
+reddat = reddat %>% filter(!(site %in% site.list))
+
+# relevel factors to exclude missing species and sites
+reddat$species = factor(reddat$species)
+reddat$site = factor(reddat$site)
+
+# before site-species combo limitation, save a version of these data
+# to use in the seed proportion analysis:
+seedpropdat = reddat
+
+# limit site-species combos to only those that have
+# a phenological shift; that would focus the data on only where we have the
+# appropriate contrasts. Also limit to site-species combos where there are at
+# least 5 plants in both phenology-accelerated and not (control)
+
+# Find these by comparing these tables:
+# table(reddat$site, reddat$phenshift.binary, reddat$species)
+
+# Bost @ RustlersGulch
+# Denu @ Pfeiler, RustlersGulch
+# Lala @ AveryPicnic
+# Mefu @ WG3C
+# Popu @ WG3C (due to sample sizes of 2 and 5 plants)
+# Rain @ WG3C
+# Taof @ StupidFalls
+
+reddat = reddat %>% filter(!(species=="Bost" & site == "RustlersGulch"))
+reddat = reddat %>% filter(!(species=="Denu" & site == "Pfeiler"))
+reddat = reddat %>% filter(!(species=="Denu" & site == "RustlersGulch"))
+reddat = reddat %>% filter(!(species=="Lala" & site == "AveryPicnic"))
+reddat = reddat %>% filter(!(species=="Mefu" & site == "WG3C"))
+reddat = reddat %>% filter(!(species=="Popu" & site == "WG3C"))
+reddat = reddat %>% filter(!(species=="Rain" & site == "WG3C"))
+reddat = reddat %>% filter(!(species=="Taof" & site == "StupidFalls"))
+
+# cleanup
+rm(spp.list, site.list)
+
+# Data without hand-pollinated plants ("commfecdat")
+commfecdat = subset(reddat, reddat$plant.treat != "open-hand")  
+```
+
+### models community fecundity
+
+need to include in the model random effects specification that there are plots (control vs. manip) nested within each site; add these in as a random effect (random intercept), nested within site: `(1|site/site.plot)`
+
+After model assessment using `DHARMA`, initial models showed significant zero-inflation (i.e. more plants with zero seeds than expected with the fitted negative binomial distribution), but no other issues. The updated models below include a zero-inflation term and do not show any particular issues in terms of model assumptions; see next section ("model assessment") for more detail.
+
+```{r models community fecundity}
+
+# shown here from simplest to most complex. We report on the most complex 
+# of the three in the paper.
+
+# model with *just* the 3-way interaction:
+comm.fec = glmmTMB(totalseeds ~ phenshift.binary:species:num.flowers + (1|site/site.plot), family = nbinom2, ziformula = ~1, data = commfecdat)
+cat("Model with 3-way interaction only:\n")
+Anova(comm.fec)
+rm(comm.fec) #cleanup
+
+# model with the 3-way interaction plus the main effect of phenshift:
+comm.fec.2 = glmmTMB(totalseeds ~ phenshift.binary/species:num.flowers + (1|site/site.plot), family = nbinom2, ziformula = ~1, data = commfecdat)
+cat("Model with 3-way interaction plus the main effect of phenshift:\n")
+Anova(comm.fec.2)
+rm(comm.fec.2) #cleanup
+
+# model with main effect of phenshift, 2-way interaction between phenshift and species, and 3-way interaction
+comm.fec.3 = glmmTMB(totalseeds ~ phenshift.binary/species/num.flowers + (1|site/site.plot), family = nbinom2, ziformula = ~1, data = commfecdat)
+cat("Model with main effect of phenshift, 2-way int b/t phenshift and species, and 3-way int:\n")
+Anova(comm.fec.3)
+# don't cleanup / remove this model just yet (do it below after saving as .csv)
+
+## use `broom.mixed` package to save model summary as a table
+aov.comm.fec = Anova(comm.fec.3)
+out.aov.comm.fec = tidy(aov.comm.fec)
+# write.csv(out.aov.comm.fec, file = "community-fecundity-model-results.csv")
+
+# cleanup
+# don't cleanup `comm.fec.3` since we need to assess model assumptions
+rm(aov.comm.fec, out.aov.comm.fec)
+
+```
+
+* all three effects highly significant:
+* main effect of `phenshift.binary`: 
+    + plot (below) shows that this main effect is negative (less overall seed production in phenologically accelerated vs. control)
+* two-way interaction between phenological acceleration and species:
+    + indicates that different species respond differently to phenological acceleration
+* three-way interaction between phenological acceleration, species, and flower number:
+    + indicates that not only do different species respond differently to phenological acceleration overall, but also that they have different responses vis-a-vis flower number (in terms of how phenological acceleration changes the slope of the {flower number} - to - {whole plant fidelity} relationship
+* following initial modeling plan, we report on the most complex of these models
+
+#### model assessment community fecundity
+
+Assess model residuals to see if the model meets basic statistical assumptions, using the `DHARMa` package
+
+```{r model assessment community fecundity}
+
+# simulate residuals using DHARMa
+# "simoutcommfec" = simulation output, community fecundity models 
+simoutcommfec <- simulateResiduals(fittedModel = comm.fec.3, plot = F)
+plot(simoutcommfec)
+testDispersion(simoutcommfec)
+testZeroInflation(simoutcommfec)
+
+# cleanup
+# rm(simoutcommfec, comm.fec.3)
+
+```
+
+Looks great! No issues with distribution of residuals, dispersion, or zero-inflation. Carry on.
+
+### plots of community-wide fecundity
+
+#### plot main effect of phenology shift on fecundity
+
+First, aggregate data to mean per-plant fecundity in each of phenologically accelerated and control plants. We have narrowed the data down to plant species - site combinations in which the plants in the snowmelt acceleration plots were actually phenologically accelerated relative to the controls, and for which there were at least 5 individuals for which fecundity was measured in both control and phenologically accelerated groups.
+
+include confidence intervals
+
+```{r phenology main effect fecundity plot, message = FALSE}
+
+phenfecsum = reddat %>% group_by(phenshift.binary) %>%
+  summarise(mean.seeds = mean(totalseeds), sd.seeds = sd(totalseeds, na.rm = T), 
+        n.plants = n()) %>%  
+        mutate(ci.upper = mean.seeds + 1.96*(sd.seeds/sqrt(n.plants))) %>% 
+        mutate(ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants)))
+
+phenfecplot = ggplot(phenfecsum, aes(x = phenshift.binary, y = mean.seeds, color = phenshift.binary)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), width = 0.1) + 
+  scale_colour_manual(values=c("darkslategray2", "orangered3")) +
+  xlab("phenological acceleration") + 
+  ylab("mean whole-plant fecundity")
+  
+
+phenfecplot # display in Rmarkdown report
+# rm(phenfecplot, phenfecsum) # cleanup
+
+```
+
+Indicates that there is an *overall reduction in fecundity* across the community in plants phenologically shifted vs. not, i.e. a **negative directional impact of phenological acceleration** on whole-plant fecundity.
+
+As in any mixed-effects model, the lack of overlap in confidence intervals cannot be interpreted to mean lack of statistical significance, because of variation in random effects. For example, sites likely have different whole-plant fecundity means if they vary in soil moisture, soil nutrients, shading, etc.; and that variation can be of similar magnitude or greater than the effect size of the main effects. 
+
+#### plot fecundity by species
+
+```{r plot fecundity by species}
+# first, summarize the data
+sumsppfec = commfecdat %>%
+  group_by(species, phenshift.binary) %>%
+  summarise(meanfecund = mean(totalseeds, na.rm = TRUE),
+            sdfecund = sd(totalseeds, na.rm = TRUE),
+            nfecund = n()) %>%
+  mutate(sefecund = sdfecund / sqrt(nfecund),
+         # here the `qt` argument is quartiles of the t-distribution;
+         # this is more conservative than using a Gaussian / z-dist
+         # e.g., in lowest sample size (14), quartile is 2.16 rather than 1.96
+         lower.ci.fecund = meanfecund - qt(1 - (0.05 / 2), nfecund - 1) * sefecund,
+         upper.ci.fecund = meanfecund + qt(1 - (0.05 / 2), nfecund - 1) * sefecund)
+
+# plot without confidence intervals:
+sppfecplot = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), color = phenshift.binary)) +
+  geom_point(size = 1.7) +
+  geom_line(aes(group = species), color = "dark grey") +
+  scale_colour_manual(values=c("darkslategray2", "orangered3")) +
+  facet_wrap(~species, nrow = 1) +
+  ylab("log(mean fecundity)") +
+  xlab("\nphenological shift (presence/absence)") +
+  ggtitle("Phenshift:Species, no CIs") +
+  theme_light() +
+  theme(axis.title.y = element_text(size = 12)) +
+  theme(axis.title.x = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black"))
+
+sppfecplot # display plot
+
+# plot with confidence intervals:
+sppfecplotci = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), color = phenshift.binary)) +
+  geom_point(size = 1.7, alpha = 0.8) +
+  geom_line(aes(group = species), color = "dark grey") +
+  scale_colour_manual(values=c("darkslategray2", "orangered3")) +
+  geom_errorbar(aes(ymin=log(lower.ci.fecund), ymax=log(upper.ci.fecund)), width=0.2, alpha = 0.5)+
+  facet_wrap(~species, nrow = 1) +
+  ylab("log(mean fecundity)") +
+  xlab("\nphenological shift (presence/absence)") +
+  ggtitle("Planttreat:Phenshift:Species, with CIs") +
+  theme_light() +
+  theme(axis.title.y = element_text(size = 12)) +
+  theme(axis.title.x = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black"))
+
+# sppfecplotci # display plot
+
+# cleanup
+# rm(sumsppfec)
+
+```
+
+#### plot interactive effects of phenology shift on fecundity
+
+plot the data to visualize the results of the community fecundity models, which show significant three-way interactions between phenological change, number for flowers and species identity.
+
+```{r Community seed - 3 way interaction, message = FALSE, warning = FALSE}
+
+# Plot
+plotcommunity2 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1), color = species)) +
+  geom_point(data = commfecdat, aes(group = species), size = 1.5, alpha = 0.5) +
+  geom_smooth(method = 'lm', se = F) +
+  theme_light() +
+  theme(axis.title.y = element_text(size = 12)) +
+  theme(axis.title.x = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black"))
+
+
+# Plot
+plotcommunity3 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1), color = species, linetype = phenshift.binary)) +
+  geom_point(data = commfecdat, aes(group = species), size = 1.5, alpha = 0.1) +
+  geom_smooth(method = 'lm', se = F) +
+  theme_light() +
+    ylim(-0.1, 8) +
+  theme(axis.title.y = element_text(size = 12)) +
+  theme(axis.title.x = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black"))
+
+# Plot
+plotcommunity1 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1), color = phenshift.binary)) +
+  geom_point(data = commfecdat, aes(group = species), size = 1.5, alpha = 0.5) +
+  geom_smooth(method = 'lm', se = F) +
+  theme_light() +
+  ylim(-0.1, 8) +
+  theme(axis.title.y = element_text(size = 12)) +
+  theme(axis.title.x = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black")) +
+  scale_colour_manual(values=c("gray60", "orangered3"))
+
+
+Fig3 = ggarrange(plotcommunity1, plotcommunity3,
+          labels = c("A", "B"),
+          ncol = 2, nrow = 1,
+          align = "v")
+
+Fig3
+# ggsave(plot = Fig3, width = 10, height = 4, dpi = 300, filename = "plotcommunity.pdf")
+rm(Fig3, plotcommunity1, plotcommunity2, plotcommunity3)
+
+```
+Shaded areas are standard errors.
+When phenological change occurs, it tends to decrease seed set with one exception, Lala. 
+* Decrease seed set may be more pronounced in Bost and Denu.
+* However, Lala seed set is increased
+
+Plotting the selfers vs non-selfers 3-way interaction.
+
+
+## Community-wide pollen limitation
+
+This analysis is focused on whether or not pollen limitation was affected by phenological acceleration. To assess pollen limitation, we conducted hand-pollination experiments in many of the non-selfing species in our study. We can then compare the difference between hand-pollinated plants (which theoretically should not be pollen limited at all) and open plants (which could experience some pollen limitation). Specifically, this analysis informs us if some of the effects of our phenological acceleration experiments are due to pollen limitation vs. resource limitation. 
+
+### data prep pollen limitation
+
+* remove species for which hand pollination not conducted
+* limit site-species combos to only those that have a phenological shift; that way we have the full-factorial data for each species in each site
+    + this was taken care of in the data prep for community fecundity, but double-checked that was the case here
+
+```{r data prep pollen limitation}
+# remove species for which hand pollination not conducted 
+nohand.spp = c("Bost", "Rain", "Taof")
+pollimdat = reddat %>% filter(!(species %in% nohand.spp))
+rm(nohand.spp) #cleanup
+
+# relevel factors to not include missing levels
+pollimdat$site = factor(pollimdat$site)
+pollimdat$species = factor(pollimdat$species)
+
+# limit site-species combos to only those that have
+# a phenological shift; that would focus the data on only where we have the
+# appropriate contrasts. also remove those with < 5 samples in a site
+
+# Find these by comparing these tables (one for each species):
+# table(pollimdat$site, pollimdat$phenshift.binary, pollimdat$species)
+# table(pollimdat$phenshift.binary, pollimdat$species, pollimdat$site)
+
+# for each species, we have at least 5 plant individuals that are phenologically
+# accelerated and not; no further work to do.
+
+```
+
+### models of community-wide pollen limitation
+
+* follow general analysis plan for community-wide seed set; use only data from non-selfers
+* include `plant.treat` (`open.hand` vs. `open`) as an interaction
+    + main effect of `plant.treat` is relatively uninteresting---we expect hand pollination to increase fecundity at least in most species
+* following analysis plan for community-wide seed set would yield a four-way interaction (phenological shift, hand pollination, species, number of flowers)
+    + but... 4-way interactions are pretty intense / hard to interpret; a simpler 3-way interaction model that excludes flower number may also capture the dynamics; try both
+    + if either the 3-way or the 4-way interaction is significant, that is consistent with differences in pollen limitation when plants are phenologically shifted vs. not
+* to get at the **directionality** of pollen limitation, assess the 2-way interaction between `plant.treat` and `phenshift.binary`---that is, do we see differences between the overall seed production levels when hand pollinated vs. open (`plant.treat`) in phenologically advanced vs. non-advanced plants (`phenshift.binary`, i.e. our experimental phenology advancement)?
+    + key to only include species that we experimentally hand-pollinated; sites where phenological acceleration occurred; and *specifically* site-species combos where we have the full-factorial combination of both phenologically advanced plants and not (control and experimentally accelerated plots within the same site), and which were hand pollinated and not
+    
+Finally, following initial model assessment with `DHARMa` we included a zero-inflation term since models without it show under-dispersion and marginally significant zero-inflation. By including zero-inflation in the model, the dispersion issues are resolved. See the next section ("model assessment") for more info.
+
+```{r models of community-wide pollen limitation}
+
+# these models were tricky to specify syntactically...
+
+# model with 2- and 3-way interactions (doesn't include flower number):
+poll.limit.mod = glmmTMB(totalseeds ~ (plant.treat:phenshift.binary)/species + 
+                  (1|site/site.plot), family = nbinom2, ziformula = ~1,
+                  data = pollimdat)
+
+# print results in Rmarkdown report
+cat("\n model with 2- and 3-way interactions (doesn't include flower number)\n")
+Anova(poll.limit.mod)
+
+# model with 2- and 4-way interactions (includes flower number)
+poll.limit.mod24 = glmmTMB(totalseeds ~ (plant.treat:phenshift.binary)/(species:num.flowers) + 
+                        (1|site/site.plot), family = nbinom2, ziformula = ~1,
+                        data = pollimdat)
+# print results in Rmarkdown report
+cat("\n model with 2- and 4-way interactions (includes flower number)\n")
+Anova(poll.limit.mod24)
+
+## use `broom.mixed` package to save model summary as a table
+# saving first model (2- & 3- way interactions only)
+aov.poll.limit.mod = Anova(poll.limit.mod)
+aov.poll.limit.mod = tidy(aov.poll.limit.mod)
+write.csv(aov.poll.limit.mod, file = "community-pollen-limitation-model-results.csv")
+
+# don't cleanup / remove models just yet, need to do assessment on them first
+
+```
+
+in a nutshell:
+
+* 2-way interaction indicates an overall effect of pollen limitation and phenological advancement
+    + plot (next code chunk) suggests *greater* pollen limitation (i.e. more negative) under phenological advancement
+    + highly significant ($p$ = 1.811e-08) when assessed in conjunction with the 3-way interaction
+    + significant ($p$ = 0.01985) when assessed with the 4-way interaction
+* 3-way interaction highly significant: this indicates that pollen limitation is different when plants are phenologically shifted vs. not (taking into account plant species)
+    + restated, this means that pollen limitation is different depending on whether or not plants were phenologically advanced in different plant species
+    + plots are consistent with the idea that directionality of the effect is different depending on species
+* 4-way interaction also highly significant: 
+    + this basically means the same thing as the 3-way, but also that phenological advancement affects pollen limitation "accumulation" with flower number differently in different species (also unsurprising)
+
+#### model assessment pollen limitation
+
+Assess model residuals to see if the model meets basic statistical assumptions, using the `DHARMa` package. Also asssess dispersion (over- and under-dispersion) and zero-inflation. Trying this out for both models, those with 3-way and with 4-way interactions.
+
+**model with 2- and 3- way interactions:**
+
+```{r model assessment pollen limitation 23}
+
+# simulate residuals using DHARMa
+# "simoutpollim" = simulation output, pollen limitation models
+# (with 2- and 3-way interactions)
+simoutpolllim <- simulateResiduals(fittedModel = poll.limit.mod, plot = F)
+cat("\n model with 2- and 3-way interactions (doesn't include flower number)\n")
+plot(simoutpolllim)
+testDispersion(simoutpolllim)
+testZeroInflation(simoutpolllim)
+```
+
+Looks good! Carry on... 
+
+**model with 2- and 4- way interactions:**
+
+```{r model assessment pollen limitation 24}
+# "simoutpollim24" = simulation output, pollen limitation models 
+# (with 2- and 4-way interactions)
+simoutpolllim24 <- simulateResiduals(fittedModel = poll.limit.mod24, plot = F)
+cat("\n model with 2- and 4-way interactions (does include flower number)\n")
+plot(simoutpolllim24)
+
+# # cleanup
+# rm(simoutpolllim, simoutpolllim24, poll.limit.mod, 
+#    poll.limit.mod24, aov.poll.limit.mod)
+
+```
+
+looks problematic in terms of residuals vs. predicted values; probably best to stick to reporting the simpler model with 2- and 3-way interactions.
+
+### plots pollen limitation
+
+#### plot summarized community pollen limitation
+
+* here plotting the 2-way interaction between `plot.treat` (hand-pollinated vs. open-pollinated) and `phenshift.binary` (whether or not a plant in a plot had been experimentally phenologically advanced)
+* this plot is to aid in the interpretation of the 2-way statistical interaction
+* going to plot means only; the CIs are not likely to be informative here given potential differences in sites and species composition (this is often the case with GLMMs)
+
+```{r community pollen limitation plot, message = FALSE}
+
+pollimsum = pollimdat %>% group_by(phenshift.binary, plant.treat) %>%
+  summarise(mean.seeds = mean(totalseeds), sd.seeds = sd(totalseeds, na.rm = T), 
+        n.plants = n()) %>% 
+        mutate(ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants))) %>% 
+        mutate(ci.upper = mean.seeds + 1.96*(sd.seeds/sqrt(n.plants)))
+
+pollimplot = ggplot(pollimsum, aes(x = phenshift.binary, y = mean.seeds, color = plant.treat)) +
+  geom_point(aes(group = plant.treat), size = 3) +
+  geom_line(aes(group = plant.treat)) + 
+  # geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), width = 0.1) + 
+  # scale_colour_manual(values=c("bisque4", "chartreuse2")) +
+  xlab("phenological acceleration") + 
+  ylab("mean whole-plant fecundity")
+
+pollimplot # display in Rmarkdown report
+# rm(pollimplot, pollimsum) # cleanup
+
+```
+
+Again, this plot suggests that experimental phenological acceleration increases pollen limitation, i.e. the difference between hand-pollinated (no pollen limitation) and open-pollinated (with possible pollen-limitation) is greater in plants with phenological acceleration relative to those without.
+
+Somewhat surprising that open-pollinated plants produced on average more seeds in the open treatment when not phenologically advanced (left-hand points), but that difference may not be statistically meaningful (again, confidence intervals are likely to be huge given site and species specific differences, and also unlikely to be helpful in interpretation here).
+
+#### plot by species pollen limitation
+
+like the above plot, but split out by species
+
+```{r plot by species pollen limitation}
+# first, summarize the data
+sumxpoll = pollimdat %>%
+  group_by(species, phenshift.binary, plant.treat) %>%
+  summarise(meanfecund = mean(totalseeds, na.rm = TRUE),
+            sdfecund = sd(totalseeds, na.rm = TRUE),
+            nfecund = n()) %>%
+  mutate(sefecund = sdfecund / sqrt(nfecund),
+         # here the `qt` argument is quartiles of the t-distribution;
+         # this is more conservative than using a Gaussian / z-dist
+         # e.g., in lowest sample size (14), quartile is 2.16 rather than 1.96
+         lower.ci.fecund = meanfecund - qt(1 - (0.05 / 2), nfecund - 1) * sefecund,
+         upper.ci.fecund = meanfecund + qt(1 - (0.05 / 2), nfecund - 1) * sefecund)
+
+# plot without confidence intervals:
+polllimplot = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), color = plant.treat)) +
+  geom_point(data = sumxpoll, size = 1.7, alpha = 0.8) +
+  geom_line(aes(group = plant.treat)) +
+  facet_wrap(~species, nrow = 1) +
+  ylab("log(mean fecundity)") +
+  xlab("\nphenological shift (presence/absence)") +
+  ggtitle("Planttreat:Phenshift:Species, no CIs") +
+  theme_light() +
+  theme(axis.title.y = element_text(size = 12)) +
+  theme(axis.title.x = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black"))
+polllimplot # display plot
+
+# plot with confidence intervals:
+polllimplotci = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), color = plant.treat)) +
+  geom_point(data = sumxpoll, size = 1.7, alpha = 0.8) +
+  geom_line(aes(group = plant.treat)) +
+  geom_errorbar(aes(ymin=log(lower.ci.fecund), ymax=log(upper.ci.fecund)), width=0.2, alpha = 0.5)+
+  facet_wrap(~species, nrow = 1) +
+  ylab("log(mean fecundity)") +
+  xlab("\nphenological shift (presence/absence)") +
+  ggtitle("Planttreat:Phenshift:Species, with CIs") +
+  theme_light() +
+  theme(axis.title.y = element_text(size = 12)) +
+  theme(axis.title.x = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black"))
+
+# cleanup
+rm(sumxpoll)
+```
+
+
+## Mixed conditional logit model (relative proportions of seed output)
+
+Assessing whether the proportions of seed produced among different plants are different in control vs. manip, using the `mclogit` package:
+
+> `mclogit` fits conditional logit models and mixed conditional logit models to count data and individual choice data, where the choice set may vary across choice occasions.
+
+this is ideal because the "choice set"---set of plant species---is different in different sites.
+
+`mclogit` uses an unusual data structure for the response variable:
+
+> The left-hand side contains is expected to be a two-column matrix. The first column contains the choice counts or choice indicators (alternative is chosen=1, is not chosen=0). The second column contains unique numbers for each choice set. If individual-level data is used, choice sets correspond to the individuals, if aggregated data with choice counts are used, choice sets may e.g. correspond to covariate classes within clusters. The right-hand of the formula contains choice predictors. It should be noted that constants are deleted from the formula as are predictors that do not vary within choice sets.
+
+We interpret this to mean that our data should have one row for each plant individual in each plot (two plots per site). The response variable should consist of 1) the seed counts (raw or standardized); and 2) an integer corresponding to each plant species.
+
+We originally tried with data agreggated such that there is one row per species per plot, but this threw an error about "insufficient within-choice set varianceError" and also probably better to have more granularity in the data, given that we can specify random effects.
+
+In these models, we want to use a slightly different dataset relative to those used in the community fecundity analyses. Here, we do *not* want to exclude site-species combinations for which there was no phenological advancement. The focal fixed effect is the snowmelt treatment, and the response is the proportion of seeds coming from the different plant species, so it is useful to the outcome if some species did not change their flowering time (i.e., phenological advancement) and others did. As before, we are not including the two sites for which the snowmelt acceleration did not change flowering phenology for any plant species.
+
+In the data prep code chunk for the community fecundity models, we saved the data following the description above as `seedpropdat`, use that dataset here.
+
+### models seed proportion
+
+```{r mclogit seed proportion, message = FALSE, warning = FALSE}
+
+# model
+seed.mclogit = suppressMessages(mclogit(cbind(totalseeds, as.integer(species))~plot.treat, random=~1|site, data = seedpropdat, 
+                                        dispersion = T))
+
+cat("Model summary, mixed conditional logit model:\n")
+summary(seed.mclogit)
+# rm(site.list, seed.mclogit) # cleanup 
+
+```
+
+The model shows a highly significant difference in counts / proportions of seed in control vs. snowmelt acceleration plots. The take-home message is that snowmelt acceleration changes proportions of seed in different plant species, i.e. alters seed production differentially across the plant community.
+
+Unfortunately, we are not aware of any methods for model assessment for `mclogit` models; in particular their output does not work as input to the `DHARMa` package. 
+
+Note that in the model specification, we set `dispersion = T` such that the model includes a specific estimate of the dispersion parameter, and thus overdispersion should not be an issue.
+
+### plot seed proportion
+
+start by summarizing seed data by site, plot treatment (snowmelt acceleration vs. control), and species
+
+```{r plot seed proportions, message = FALSE}
+
+# summarize data
+propdat <- seedpropdat %>% group_by(site, site.abbrev, plot.treat, 
+              species) %>%
+          summarise(n.plants=n(), mean.seed=mean(totalseeds), 
+              sd.seed=sd(totalseeds))
+
+# getting a decent color palette is tough for these
+# using `scale_fill_brewer(palette = "Set2")`; 
+# initially used "Set3" but described as "clown vomit"
+
+propseed = ggplot(propdat, aes(fill=species, y=mean.seed, x=plot.treat)) + 
+    geom_bar(position="fill", stat="identity") + facet_grid(~ site.abbrev) +
+    theme_light() +
+    scale_fill_brewer(palette = "Set2") + 
+   xlab("") + ylab("proportion of seeds") +
+  theme(axis.title.y = element_text(size = 12)) +
+    theme(axis.text.y = element_text(size = 12)) +
+  theme(axis.text.x = element_text(size = 12, angle = 90, vjust = 0.5, hjust = 0)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black"))
+
+propseed
+# SAVE THIS PLOT
+rm(propseed, propdat)
+
+```
+
+# SessionInfo
+
+for reproducibility
+
+```{r sessionInfo}
+sessionInfo()
+```
+

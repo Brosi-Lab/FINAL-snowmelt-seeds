@@ -1,0 +1,17 @@
+site,plot.treat,meltday,meltaccel
+AveryPicnic,control,159,0
+403Bench,control,173,0
+BellviewBench,control,173,0
+Meridian,control,160,0
+Pfieler,control,174,0
+RustlersGulch,control,162,0
+StupidFalls,control,152,0
+WG3C,control,159,0
+AveryPicnic,manip,154,5
+403Bench,manip,167,6
+BellviewBench,manip,172,1
+Meridian,manip,151,9
+Pfieler,manip,157,17
+RustlersGulch,manip,156,6
+StupidFalls,manip,139,13
+WG3C,manip,152,7

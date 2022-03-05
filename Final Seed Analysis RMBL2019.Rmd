@@ -20,6 +20,9 @@ In this analysis, we assess if the timing of snowmelt impacts seed set in montan
 
 ```{r packages, message = F, results = F, warning = F}
 
+# (note that chunk header is set to not display results / messages / warnings
+# otherwise a substantial amount of unhelpful text printed in the report)
+
 # clear environment:
 rm(list = ls())
 
@@ -31,6 +34,7 @@ Packages <- c("tidyverse", "knitr", "kableExtra", "glmmTMB", "fitdistrplus",
 
 # # this next line checks to see if all of the packages are installed
 # # if not, it installs them; note `installed.packages()` can be a little slow
+# # keep the code below commented out for faster knitting:
 # install.packages(setdiff(Packages, rownames(installed.packages())), repos = "http://cran.us.r-project.org")
 
 # this line loads all of the packages:
@@ -208,7 +212,9 @@ snowmelttemp = snowmeltdat[ , !(names(snowmeltdat) %in% drops)]
 
 # merge
 masterdat <- merge(masterdat, snowmelttemp, by="meltID")
-rm(drops, snowmelttemp) #cleanup
+
+# cleanup
+rm(drops, snowmelttemp) 
 
 ```
 
@@ -231,7 +237,7 @@ masterdat = left_join(masterdat, phenoshift, by = "site.plot.sp")
 masterdat$phenshift.binary="no"
 masterdat$phenshift.binary[masterdat$phenshift>0]="yes"
 
-# cleanup
+# cleanup (`phenoshift` data not subsequently used)
 rm(phenoshift)
 ```
 
@@ -318,6 +324,7 @@ isitgonnabepois <- fitdist(masterdat$totalseeds,"pois")
 isitgonnabenbinom <- fitdist(masterdat$totalseeds,"nbinom")
 
 # plot them:
+# note: the side-by-side display of the plots specified in chunk header
 plot(isitgonnabepois, title = "Poisson")
 plot(isitgonnabenbinom, title = "Neg Binomial")
 
@@ -336,6 +343,7 @@ Here's a plot of the Julian days that the snowmelt-accelerated plots melted out,
 
 ```{r Plot meltout dates by plot, eval = T, echo = FALSE}
 
+# first arrange sites by magnitude of snowmelt acceleration:
 snowmeltdat$sitesort = factor(snowmeltdat$site, levels=c("Pfeiler",
          'BellviewBench',
          '403Bench',
@@ -360,10 +368,11 @@ plotsnow = ggplot(snowmeltdat, aes(y=sitesort, x=meltday, group = site, color = 
                                   colour ="black")) +
   scale_colour_manual(values=c("orangered3", "darkslategray2"))
 
+# display plot
 plotsnow
 
 # cleanup: remove entire `snowmeltdat` dataframe, not used again
-# don't remove plot just yet, until it is combined with the other one
+# don't remove plot (`plotsnow`) just yet, until it is combined with other plot
 rm(snowmeltdat) 
 
 ```
@@ -377,7 +386,8 @@ While it would seem natural to use the `phenoshift` dataset here, which is alrea
 
 # first aggregation (get rid of pseudoreplication)
 meansbysite = masterdat %>% filter(plot.treat == "accel") %>% 
-  group_by(site, species) %>% summarise(speciesmean = mean(phenshift, na.rm = T))
+  group_by(site, species) %>% summarise(speciesmean = mean(phenshift, 
+                                                           na.rm = T))
 
 # get rid of NAs (2 site-by-species combos only have NAs)
 meansbysite = meansbysite %>% filter(!(is.na(speciesmean)))
@@ -388,7 +398,9 @@ meansbysite = meansbysite %>% group_by(site) %>%
     mutate(upper = mean + 1.96*(std/sqrt(n)), lower = mean - 1.96*(std/sqrt(n)))
 
 # relevel in melt-out order:
-meansbysite$site <- factor(meansbysite$site, levels = c("Pfeiler", "BellviewBench", "403Bench", "RustlersGulch", "Meridian","AveryPicnic", "WG3C", "StupidFalls"))
+meansbysite$site <- factor(meansbysite$site, levels = c("Pfeiler", 
+                    "BellviewBench", "403Bench", "RustlersGulch", "Meridian",
+                    "AveryPicnic", "WG3C", "StupidFalls"))
 
 # plot
 meanplotbysite <- ggplot(meansbysite, aes(x=mean, y=site)) + 
@@ -404,6 +416,8 @@ meanplotbysite <- ggplot(meansbysite, aes(x=mean, y=site)) +
 # display plot
 meanplotbysite
 
+# note: don't remove plot object until merged with previous plot
+
 ```
 
 #### Combine snow and phenology plots
@@ -417,6 +431,7 @@ Combined plot not shown in this report but is saved for publication. Before comb
 meanplotbysite = meanplotbysite + theme(axis.text.y = element_blank()) 
 
 # combine with snowmelt plot
+# (chunk header has code that prevents it from being displayed)
 meltphenplot = grid.arrange(plotsnow, meanplotbysite, nrow = 1)
 
 # # SAVE PLOT: (keep this commented out to prevent repeated saving on GitHub)
@@ -425,7 +440,7 @@ meltphenplot = grid.arrange(plotsnow, meanplotbysite, nrow = 1)
 
 # cleanup
 # includes removing `phenoshift` dataset, not used again
-rm(plotsnow, phenoshift, meanplotbysite, meansbysite, meltphenplot)
+rm(plotsnow, meanplotbysite, meansbysite, meltphenplot)
 
 ```
 
@@ -531,7 +546,7 @@ need to include in the model random effects specification that there are plots (
 
 After model assessment using `DHARMA`, initial models showed significant zero-inflation (i.e. more plants with zero seeds than expected with the fitted negative binomial distribution), but no other issues. The updated models below include a zero-inflation term and do not show any particular issues in terms of model assumptions; see next section ("model assessment") for more detail.
 
-```{r models community fecundity}
+```{r models community fecundity, cache = T}
 
 # shown here from simplest to most complex. We report on the most complex 
 # of the three in the paper.
@@ -588,7 +603,7 @@ testDispersion(simoutcommfec, plot = F)
 testZeroInflation(simoutcommfec, plot = F)
 
 # cleanup
-# rm(simoutcommfec, comm.fec.3)
+rm(simoutcommfec, comm.fec.3)
 
 ```
 
@@ -621,10 +636,10 @@ phenfecplot # display in Rmarkdown report
 # # save plot
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
-ggsave(phenfecplot, file = "plots/aggregated-fecundity-by-phenology.pdf",
-   width = 3, height = 3)
+# ggsave(phenfecplot, file = "plots/aggregated-fecundity-by-phenology.pdf",
+#   width = 3, height = 3)
 
-# rm(phenfecplot, phenfecsum) # cleanup
+rm(phenfecplot, phenfecsum) # cleanup
 
 ```
 
@@ -707,7 +722,7 @@ rm(sumsppfec, sppfecplot, sppfecplotci)
 
 plot the data to visualize the results of the community fecundity models, which show significant three-way interactions between phenological change, number for flowers and species identity.
 
-```{r plot interactive effects of phenology shift on fecundity, message = FALSE, warning = FALSE}
+```{r plot interactive phenology fecundity, message = FALSE, warning = FALSE}
 
 # Plot fecundity by flower number, species aggregated:
 plotcommunity1 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1),
@@ -758,14 +773,15 @@ Fig3
 # # for now, the one without CIs
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
-ggsave(plot = Fig3, width = 9, height = 4, 
-       filename = "plots/community-fecundity-interactive.pdf")
+# ggsave(plot = Fig3, width = 9, height = 4, 
+#        filename = "plots/community-fecundity-interactive.pdf")
 
 # clean up
 rm(Fig3, plotcommunity1, plotcommunity2)
 
 ```
-Left panel (A) essentially shows the same thing as the aggregated plot, i.e. that phenological shifts overall reduce total fecunity; but shows it in interaction with flower number (agnostic to species identity)
+
+Left panel (A) essentially shows the same thing as the aggregated plot, i.e. that phenological shifts overall reduce total fecundity; but shows it in interaction with flower number (agnostic to species identity)
 
 Right panel (B) basically shows the same thing as the previous graph (though perhaps less clearly)---i.e. that different species respond differently to phenological acceleration. 
 
@@ -905,7 +921,7 @@ looks problematic in terms of residuals vs. predicted values; probably best to s
 
 * here plotting the 2-way interaction between `plot.treat` (hand-pollinated vs. open-pollinated) and `phenshift.binary` (whether or not a plant in a plot had been experimentally phenologically advanced)
 * this plot is to aid in the interpretation of the 2-way statistical interaction
-* going to plot means only; the CIs are not likely to be informative here given potential differences in sites and species composition (this is often the case with GLMMs)
+* going to plot means only; the CIs are not likely to be informative here given potential differences in sites and species composition (as is typically the case with GLMMs)
 
 ```{r community pollen limitation plot, message = FALSE}
 
@@ -915,16 +931,30 @@ pollimsum = pollimdat %>% group_by(phenshift.binary, plant.treat) %>%
         mutate(ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants))) %>% 
         mutate(ci.upper = mean.seeds + 1.96*(sd.seeds/sqrt(n.plants)))
 
-pollimplot = ggplot(pollimsum, aes(x = phenshift.binary, y = mean.seeds, color = plant.treat)) +
+pollimplot = ggplot(pollimsum, aes(x = phenshift.binary, y = mean.seeds, 
+                                   color = plant.treat)) +
   geom_point(aes(group = plant.treat), size = 3) +
   geom_line(aes(group = plant.treat)) + 
+  scale_colour_manual(values=c("gray36", "darkgoldenrod1")) + 
+  # # (to add CIs, un-comment the two lines below:)
   # geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), width = 0.1) + 
   # scale_colour_manual(values=c("bisque4", "chartreuse2")) +
   xlab("phenological acceleration") + 
   ylab("mean whole-plant fecundity")
 
-pollimplot # display in Rmarkdown report
-# rm(pollimplot, pollimsum) # cleanup
+# display in Rmarkdown report
+pollimplot 
+
+# # SAVE PLOT
+# # =============================
+# # for now, the one without CIs
+# # (keep this commented out to prevent repeated saving on GitHub)
+# # re-save when this changes, but only as needed
+# ggsave(plot = pollimplot, width = 6, height = 4,
+#        filename = "plots/aggregated-pollen-limitation-plot.pdf")
+
+# cleanup
+# rm(pollimplot, pollimsum) 
 
 ```
 
@@ -961,8 +991,10 @@ polllimplot = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), color 
   theme_light() +
   theme(axis.title.y = element_text(size = 12)) +
   theme(axis.title.x = element_text(size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(strip.text.x = element_text(size = 12, colour = "black"))
+  theme(axis.text = element_text(size = 10)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black")) + 
+  scale_colour_manual(values=c("gray36", "darkgoldenrod1"))
+
 polllimplot # display plot
 
 # plot with confidence intervals:
@@ -977,11 +1009,21 @@ polllimplotci = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), colo
   theme_light() +
   theme(axis.title.y = element_text(size = 12)) +
   theme(axis.title.x = element_text(size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(strip.text.x = element_text(size = 12, colour = "black"))
+  theme(axis.text = element_text(size = 10)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black")) + 
+  scale_colour_manual(values=c("gray36", "darkgoldenrod1"))
+
+# # SAVE PLOT
+# # =============================
+# # for now, the one without CIs
+# # (keep this commented out to prevent repeated saving on GitHub)
+# # re-save when this changes, but only as needed
+# ggsave(plot = polllimplot, width = 6, height = 4,
+#        filename = "plots/pollen-limitation-plot.pdf")
 
 # cleanup
-rm(sumxpoll)
+rm(sumxpoll, polllimplotci, polllimplot)
+
 ```
 
 
@@ -1015,7 +1057,7 @@ seed.mclogit = suppressMessages(mclogit(cbind(totalseeds, as.integer(species))~p
 
 cat("Model summary, mixed conditional logit model:\n")
 summary(seed.mclogit)
-# rm(site.list, seed.mclogit) # cleanup 
+rm(site.list, seed.mclogit) # cleanup 
 
 ```
 
@@ -1023,7 +1065,7 @@ The model shows a highly significant difference in counts / proportions of seed 
 
 Unfortunately, we are not aware of any methods for model assessment for `mclogit` models; in particular their output does not work as input to the `DHARMa` package. 
 
-Note that in the model specification, we set `dispersion = T` such that the model includes a specific estimate of the dispersion parameter, and thus overdispersion should not be an issue.
+Note that in the model specification, we set `dispersion = T` such that the model includes an estimate of the dispersion parameter, and thus overdispersion should not be an issue.
 
 ### plot seed proportion
 
@@ -1047,12 +1089,21 @@ propseed = ggplot(propdat, aes(fill=species, y=mean.seed, x=plot.treat)) +
     scale_fill_brewer(palette = "Set2") + 
    xlab("") + ylab("proportion of seeds") +
   theme(axis.title.y = element_text(size = 12)) +
-    theme(axis.text.y = element_text(size = 12)) +
-  theme(axis.text.x = element_text(size = 12, angle = 90, vjust = 0.5, hjust = 0)) +
+    theme(axis.text.y = element_text(size = 10)) +
+  theme(axis.text.x = element_text(size = 10, angle = 90, vjust = 0.5, hjust = 0)) +
   theme(strip.text.x = element_text(size = 12, colour = "black"))
 
+# display plot 
 propseed
-# SAVE THIS PLOT
+
+# # SAVE PLOT
+# # =============================
+# # (keep this commented out to prevent repeated saving on GitHub)
+# # re-save when this changes, but only as needed
+ggsave(plot = propseed, width = 6, height = 4,
+       filename = "plots/seed-proportion-plot.pdf")
+
+# cleanup
 rm(propseed, propdat)
 
 ```

@@ -546,7 +546,7 @@ need to include in the model random effects specification that there are plots (
 
 After model assessment using `DHARMA`, initial models showed significant zero-inflation (i.e. more plants with zero seeds than expected with the fitted negative binomial distribution), but no other issues. The updated models below include a zero-inflation term and do not show any particular issues in terms of model assumptions; see next section ("model assessment") for more detail.
 
-```{r models community fecundity, cache = T}
+```{r models community fecundity}
 
 # shown here from simplest to most complex. We report on the most complex 
 # of the three in the paper.

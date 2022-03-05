@@ -16,11 +16,6 @@ output:
 
 In this analysis, we assess if the timing of snowmelt impacts seed set in montane plant communities, with a plant-community-level focus. We conducted an accelerated snowmelt experiment at RMBL, Colorado in summer 2019. We worked at 8 sites scattered across 2 valleys. In each site, we had paired control and snowmelt acceleration plots, each 14 x 10 m (thus there were 16 plots total). We accelerated snowmelt by solarizing the snow with black shade cloth, which was removed just before snow melted to ground level. Snowmelt rate in control plots was unmanipulated. In many plant species, accelerating snowmelt caused earlier plant flowering relative to controls. We hypothesize that earlier snowmelt date could affect plant seed set through advances in flowering time that potentiate plant-pollinator phenology mismatches.
 
-## TO-DOs
-
-> stitch figures together; particularly figs 1a & 1b (overall snowmelt date and phenology acceleration by site)
-
-
 ## Package Installation
 
 ```{r packages, message = F, results = F, warning = F}
@@ -32,7 +27,7 @@ rm(list = ls())
 # (ADD / delete the packages you need / don't below!)
 Packages <- c("tidyverse", "knitr", "kableExtra", "glmmTMB", "fitdistrplus", 
               "reshape2", "vegan", "car", "ggpubr", "broom.mixed", "mclogit", 
-              "DHARMa") 
+              "DHARMa", "gridExtra") 
 
 # # this next line checks to see if all of the packages are installed
 # # if not, it installs them; note `installed.packages()` can be a little slow
@@ -312,27 +307,26 @@ These totals come after substantial data cleaning and as such do not include bag
 
 ### Distribution choice for seed data
 
-Before we fit any models, we want to see how the response variable (seed count) is distributed. It is a discrete count variable; in past data analyses, seed counts have been overdispersed and fit much better with a negative binomial distribution than with a Poisson, but worth a quick check.
+Before we fit any models, we want to see how the response variable (seed count) is distributed. It is a discrete count variable; in past data analyses, seed counts have been overdispersed and fit much better with a negative binomial distribution than with a Poisson, but worth a quick check. Not worth saving the graphs, include in this report but not in publication.
 
-```{r Distribution fitting}
+In the plot below, **Poisson is on the left** and **Neg Binomial is on the right**, and the distributions are also named in the plot legends (couldn't find an easy way to include a title with `plotfitdist`).
+
+```{r Distribution fitting, fig.show="hold", out.width="50%", warning = F, message = FALSE}
 
 # assess distribution of the response variable
 isitgonnabepois <- fitdist(masterdat$totalseeds,"pois")
 isitgonnabenbinom <- fitdist(masterdat$totalseeds,"nbinom")
 
 # plot them:
-cat("Poisson:\n") # this just prints the title before the plot
-plot(isitgonnabepois)
-cat("Negative Binomial:\n") # again, printing the title before the plot
-plot(isitgonnabenbinom) # negative bionmial is the one!
+plot(isitgonnabepois, title = "Poisson")
+plot(isitgonnabenbinom, title = "Neg Binomial")
 
 # cleanup, including `plants.per.treat` from previous code chunk
 rm(isitgonnabenbinom, isitgonnabepois, plants.per.treat) 
 
 ```
 
-The seed data generally fit a negative binomial distribution much better than a Poisson (no surprise). We will also assess overdispersion when actually running models.
-
+The seed data generally fit a negative binomial distribution much better than a Poisson (no surprise). We also separately assess model assumptions (residuals, overdispersion, zero-inflation) after each statistical modeling section.
 
 ### Plots of overall snowmelt and phenology
 
@@ -355,26 +349,29 @@ snowmeltdat$sitesort = factor(snowmeltdat$site, levels=c("Pfeiler",
 # Plot
 plotsnow = ggplot(snowmeltdat, aes(y=sitesort, x=meltday, group = site, color = plot.treat)) + 
   geom_point(size = 4) +
-  geom_line(color = "black") +
+  geom_line(color = "black", arrow = arrow(angle = 30, length = unit(0.09, "inches"), ends = "first", type = "open")) + 
   theme_light() +
   xlab("meltout day of year") + ylab("sites") +
-  theme(axis.title.y = element_text(size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
+  theme(axis.title.y = element_text(size = 10)) +
+  theme(axis.text = element_text(size = 10)) +
   theme(strip.text.x = element_text(size = 12, colour = "black")) +
+  theme(legend.position = c(0.85, 0.8)) + 
+  theme(legend.background = element_rect(linetype="solid", 
+                                  colour ="black")) +
   scale_colour_manual(values=c("orangered3", "darkslategray2"))
 
 plotsnow
-#ggsave(plot = plotsnow, width = 6, height = 3, dpi = 300, filename = "plotsnow.pdf")
 
-# cleanup
-# includes removing entire `snowmeltdat` dataframe, not used again
-# rm(plotsnow, snowmeltdat) 
+# cleanup: remove entire `snowmeltdat` dataframe, not used again
+# don't remove plot just yet, until it is combined with the other one
+rm(snowmeltdat) 
 
 ```
 
 #### Phenology plot
 
 While it would seem natural to use the `phenoshift` dataset here, which is already aggregated by site, plot, and species (not `masterdat`), the issue is that some of the species in `phenoshift` were assessed for phenology but did not ultimately have fecundity measured (either at all, or within some of the plots). At the same time, post-merge the phenology data are pseudoreplicated in `masterdat` (i.e. recorded on each line, but actually only measured at the species-by-plot level). To get rid of the pseudoreplication issue, conduct a two-stage summarization of the `masterdat` data. First, calculate the per-species, per-site mean phenology shift; for any given species, the numbers are all the same (again because they were filled in by the merge). Second, once the data have been aggregated to the site-by-species level, *then* take the mean again to calculate the true per-site mean; at this point we can also calculate standard deviations and thus confidence intervals.
+
 
 ```{r Phenology plot, warning = FALSE}
 
@@ -400,25 +397,38 @@ meanplotbysite <- ggplot(meansbysite, aes(x=mean, y=site)) +
   geom_errorbarh(aes(xmin = lower, xmax = upper), height = .4) +
   ylab("") +
   xlab("phenological shift relative to control (weeks)") +
-  theme_light()
-
-# additional plot formatting
-meanplotbysite = meanplotbysite + theme(
-  axis.text.x = element_text(size = 12),
-    axis.text.y = element_text(size = 12),
-  axis.ticks = element_blank())
+  theme_light() +
+  theme(axis.text.x = element_text(size = 12)) + 
+  theme(axis.ticks = element_blank())
 
 # display plot
 meanplotbysite
 
-# # save plot: (keep this commented out to prevent repeated saving on GitHub)
-# meanplotbysite = ggsave("meanphenoshiftplot.png", width = 5, height = 3)
+```
+
+#### Combine snow and phenology plots
+
+Combined plot not shown in this report but is saved for publication. Before combining the plots, remove the *y*-axis labels (sites) from the phenology plot since they are the same as for the snowmelt plot, to save space.
+
+```{r combine snow and phenology plots, fig.show='hide'}
+
+# get rid of y-axis labels in phenology data 
+# in preparation for merging with snowmelt plot:
+meanplotbysite = meanplotbysite + theme(axis.text.y = element_blank()) 
+
+# combine with snowmelt plot
+meltphenplot = grid.arrange(plotsnow, meanplotbysite, nrow = 1)
+
+# # SAVE PLOT: (keep this commented out to prevent repeated saving on GitHub)
+# # re-save when this changes, but only as needed
+# ggsave(meltphenplot, file = "plots/meltphenplot.pdf", width = 9, height = 3)
 
 # cleanup
 # includes removing `phenoshift` dataset, not used again
-rm(phenoshift, meanplotbysite, meansbysite)
+rm(plotsnow, phenoshift, meanplotbysite, meansbysite, meltphenplot)
 
 ```
+
 
 ## Community Fecundity
 
@@ -582,7 +592,7 @@ testZeroInflation(simoutcommfec, plot = F)
 
 ```
 
-Looks great! No issues with distribution of residuals, dispersion, or zero-inflation. Carry on.
+Looks great! No noticeable issues with distribution of residuals, heteroscedasticity, dispersion, or zero-inflation. Carry on.
 
 ### plots of community-wide fecundity
 
@@ -603,17 +613,24 @@ phenfecplot = ggplot(phenfecsum, aes(x = phenshift.binary, y = mean.seeds, color
   geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), width = 0.1) + 
   scale_colour_manual(values=c("darkslategray2", "orangered3")) +
   xlab("phenological acceleration") + 
-  ylab("mean whole-plant fecundity")
-  
+  ylab("mean whole-plant fecundity") +
+  theme(legend.position = "none")
 
 phenfecplot # display in Rmarkdown report
+
+# # save plot
+# # (keep this commented out to prevent repeated saving on GitHub)
+# # re-save when this changes, but only as needed
+ggsave(phenfecplot, file = "plots/aggregated-fecundity-by-phenology.pdf",
+   width = 3, height = 3)
+
 # rm(phenfecplot, phenfecsum) # cleanup
 
 ```
 
 Indicates that there is an *overall reduction in fecundity* across the community in plants phenologically shifted vs. not, i.e. a **negative directional impact of phenological acceleration** on whole-plant fecundity.
 
-As in any mixed-effects model, the lack of overlap in confidence intervals cannot be interpreted to mean lack of statistical significance, because of variation in random effects. For example, sites likely have different whole-plant fecundity means if they vary in soil moisture, soil nutrients, shading, etc.; and that variation can be of similar magnitude or greater than the effect size of the main effects. 
+Note: as in any mixed-effects model, the lack of overlap in confidence intervals cannot be interpreted to mean lack of statistical significance, because of variation in random effects. For example, sites likely have different whole-plant fecundity means if they vary in soil moisture, soil nutrients, shading, etc.; and that variation can be of similar magnitude or greater than the effect size of the main effects. 
 
 #### plot fecundity by species
 
@@ -627,47 +644,62 @@ sumsppfec = commfecdat %>%
   mutate(sefecund = sdfecund / sqrt(nfecund),
          # here the `qt` argument is quartiles of the t-distribution;
          # this is more conservative than using a Gaussian / z-dist
-         # e.g., in lowest sample size (14), quartile is 2.16 rather than 1.96
+         # e.g., in lowest sample size (14), it is 2.16 rather than 1.96
          lower.ci.fecund = meanfecund - qt(1 - (0.05 / 2), nfecund - 1) * sefecund,
          upper.ci.fecund = meanfecund + qt(1 - (0.05 / 2), nfecund - 1) * sefecund)
 
 # plot without confidence intervals:
 sppfecplot = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), color = phenshift.binary)) +
+  geom_line(aes(group = species), color = "grey36", arrow = arrow(angle = 30, 
+      length = unit(0.07, "inches"), ends = "last", type = "open")) + 
   geom_point(size = 1.7) +
-  geom_line(aes(group = species), color = "dark grey") +
   scale_colour_manual(values=c("darkslategray2", "orangered3")) +
   facet_wrap(~species, nrow = 1) +
-  ylab("log(mean fecundity)") +
-  xlab("\nphenological shift (presence/absence)") +
-  ggtitle("Phenshift:Species, no CIs") +
+  ylab("log(mean fecundity)") + 
+  xlab("\nphenological shift (no = control, yes = accelerated)") +
+  ggtitle("Phenology shift by species effects on fecundity") +
   theme_light() +
-  theme(axis.title.y = element_text(size = 12)) +
-  theme(axis.title.x = element_text(size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(strip.text.x = element_text(size = 12, colour = "black"))
+  theme(axis.title.y = element_text(size = 9)) +
+  theme(axis.title.x = element_text(size = 9)) +
+  theme(axis.text = element_text(size = 8)) +
+  theme(strip.text.x = element_text(size = 9, colour = "black")) + 
+  theme(legend.position = "none")
 
-sppfecplot # display plot
+# display plot
+sppfecplot 
 
 # plot with confidence intervals:
 sppfecplotci = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), color = phenshift.binary)) +
+  geom_line(aes(group = species), color = "grey36", arrow = arrow(angle = 30, 
+            length = unit(0.07, "inches"), ends = "last", type = "open")) + 
   geom_point(size = 1.7, alpha = 0.8) +
-  geom_line(aes(group = species), color = "dark grey") +
   scale_colour_manual(values=c("darkslategray2", "orangered3")) +
   geom_errorbar(aes(ymin=log(lower.ci.fecund), ymax=log(upper.ci.fecund)), width=0.2, alpha = 0.5)+
   facet_wrap(~species, nrow = 1) +
   ylab("log(mean fecundity)") +
-  xlab("\nphenological shift (presence/absence)") +
-  ggtitle("Planttreat:Phenshift:Species, with CIs") +
+  xlab("\nphenological shift (no = control, yes = accelerated)") +
+  ggtitle("Phenology shift by species effects on fecundity") +
   theme_light() +
-  theme(axis.title.y = element_text(size = 12)) +
-  theme(axis.title.x = element_text(size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(strip.text.x = element_text(size = 12, colour = "black"))
+  theme(axis.title.y = element_text(size = 9)) +
+  theme(axis.title.x = element_text(size = 9)) +
+  theme(axis.text = element_text(size = 8)) +
+  theme(strip.text.x = element_text(size = 9, colour = "black")) + 
+  theme(legend.position = "none")
 
-# sppfecplotci # display plot
+# # display plot with CIs
+# # (commented out for this report)
+# sppfecplotci
+
+# # SAVE PLOT
+# # =============================
+# # for now, the one without CIs
+# # (keep this commented out to prevent repeated saving on GitHub)
+# # re-save when this changes, but only as needed
+# ggsave(sppfecplot, file = "plots/fecundity-by-species-phenology.pdf",
+#    width = 5, height = 3)
 
 # cleanup
-# rm(sumsppfec)
+rm(sumsppfec, sppfecplot, sppfecplotci)
 
 ```
 
@@ -675,32 +707,11 @@ sppfecplotci = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), colo
 
 plot the data to visualize the results of the community fecundity models, which show significant three-way interactions between phenological change, number for flowers and species identity.
 
-```{r Community seed - 3 way interaction, message = FALSE, warning = FALSE}
+```{r plot interactive effects of phenology shift on fecundity, message = FALSE, warning = FALSE}
 
-# Plot
-plotcommunity2 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1), color = species)) +
-  geom_point(data = commfecdat, aes(group = species), size = 1.5, alpha = 0.5) +
-  geom_smooth(method = 'lm', se = F) +
-  theme_light() +
-  theme(axis.title.y = element_text(size = 12)) +
-  theme(axis.title.x = element_text(size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(strip.text.x = element_text(size = 12, colour = "black"))
-
-
-# Plot
-plotcommunity3 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1), color = species, linetype = phenshift.binary)) +
-  geom_point(data = commfecdat, aes(group = species), size = 1.5, alpha = 0.1) +
-  geom_smooth(method = 'lm', se = F) +
-  theme_light() +
-    ylim(-0.1, 8) +
-  theme(axis.title.y = element_text(size = 12)) +
-  theme(axis.title.x = element_text(size = 12)) +
-  theme(axis.text = element_text(size = 12)) +
-  theme(strip.text.x = element_text(size = 12, colour = "black"))
-
-# Plot
-plotcommunity1 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1), color = phenshift.binary)) +
+# Plot fecundity by flower number, species aggregated:
+plotcommunity1 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1),
+                        color = phenshift.binary, linetype = phenshift.binary)) +
   geom_point(data = commfecdat, aes(group = species), size = 1.5, alpha = 0.5) +
   geom_smooth(method = 'lm', se = F) +
   theme_light() +
@@ -709,26 +720,54 @@ plotcommunity1 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1),
   theme(axis.title.x = element_text(size = 12)) +
   theme(axis.text = element_text(size = 12)) +
   theme(strip.text.x = element_text(size = 12, colour = "black")) +
-  scale_colour_manual(values=c("gray60", "orangered3"))
+  scale_colour_manual(values=c("darkslategray2", "orangered3")) +
+  theme(legend.position = c(0.85, 0.875)) +
+  # theme(legend.background = element_rect(linetype="solid", 
+  #                                 colour ="grey36"))
+  theme(legend.background = element_rect(fill = "transparent", colour = "transparent"))
+  
+  
+# Plot fecundity by flower number, species separated by color:
+plotcommunity2 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1), 
+                        color = species, linetype = phenshift.binary)) +
+  geom_point(data = commfecdat, aes(group = species), size = 1.5, alpha = 0.1) +
+  geom_smooth(method = 'lm', se = F) +
+  theme_light() +
+    ylim(-0.1, 8) +
+  # theme(axis.title.y = element_text(size = 12)) +
+  theme(axis.title.y = element_blank()) +
+  theme(axis.title.x = element_text(size = 12)) +
+  theme(axis.text = element_text(size = 12)) +
+  theme(strip.text.x = element_text(size = 12, colour = "black")) + 
+  # get rid of y-axis labels, since they are the same as the other plot
+  theme(axis.text.y = element_blank()) 
 
-
-Fig3 = ggarrange(plotcommunity1, plotcommunity3,
+Fig3 = ggarrange(plotcommunity1, plotcommunity2,
           labels = c("A", "B"),
+          # next two lines adjust label {"A", "B"} position
+          hjust = c(-3.5, -1.25),
+          vjust = 2,
           ncol = 2, nrow = 1,
           align = "v")
 
+# display combined plot
 Fig3
-# ggsave(plot = Fig3, width = 10, height = 4, dpi = 300, filename = "plotcommunity.pdf")
-rm(Fig3, plotcommunity1, plotcommunity2, plotcommunity3)
+
+# # SAVE PLOT
+# # =============================
+# # for now, the one without CIs
+# # (keep this commented out to prevent repeated saving on GitHub)
+# # re-save when this changes, but only as needed
+ggsave(plot = Fig3, width = 9, height = 4, 
+       filename = "plots/community-fecundity-interactive.pdf")
+
+# clean up
+rm(Fig3, plotcommunity1, plotcommunity2)
 
 ```
-Shaded areas are standard errors.
-When phenological change occurs, it tends to decrease seed set with one exception, Lala. 
-* Decrease seed set may be more pronounced in Bost and Denu.
-* However, Lala seed set is increased
+Left panel (A) essentially shows the same thing as the aggregated plot, i.e. that phenological shifts overall reduce total fecunity; but shows it in interaction with flower number (agnostic to species identity)
 
-Plotting the selfers vs non-selfers 3-way interaction.
-
+Right panel (B) basically shows the same thing as the previous graph (though perhaps less clearly)---i.e. that different species respond differently to phenological acceleration. 
 
 ## Community-wide pollen limitation
 

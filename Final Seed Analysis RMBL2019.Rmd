@@ -272,6 +272,8 @@ there are three primary classes of analyses, all at a community level:
 * relative proportions of seed output
     + even if community-level fecundity changes, we want to know the potential for reshaping plant communities; this analysis assesses if the relative proportions of seed produced change in control vs. snowmelt acceleration plots (in the same site)
 
+in terms of workspace / environment management, this analysis is set up for cleanliness. Ultimately maintaining the one master data file (`masterdat`) and one subsetted data file for each of the three classes of analysis. Other objects (models, plots, variables) are maintained only as long as necessary.  
+
 ## Preliminaries
 
 Analysis preliminaries include: 
@@ -816,6 +818,9 @@ pollimdat$species = factor(pollimdat$species)
 # for each species, we have at least 5 plant individuals that are phenologically
 # accelerated and not; no further work to do.
 
+# cleanup `reddat`--no longer used
+rm(reddat) 
+
 ```
 
 ### models of community-wide pollen limitation
@@ -887,8 +892,9 @@ Assess model residuals to see if the model meets basic statistical assumptions, 
 # "simoutpollim" = simulation output, pollen limitation models
 # (with 2- and 3-way interactions)
 simoutpolllim <- simulateResiduals(fittedModel = poll.limit.mod, plot = F)
-cat("\n model with 2- and 3-way interactions (doesn't include flower number)\n")
 plot(simoutpolllim)
+
+# print dispersion and zero-inflation test results (don't plot for space)
 testDispersion(simoutpolllim, plot = F)
 testZeroInflation(simoutpolllim, plot = F)
 ```
@@ -901,13 +907,13 @@ Looks good! Carry on...
 # "simoutpollim24" = simulation output, pollen limitation models 
 # (with 2- and 4-way interactions)
 simoutpolllim24 <- simulateResiduals(fittedModel = poll.limit.mod24, plot = F)
-cat("\n model with 2- and 4-way interactions (does include flower number)\n")
 plot(simoutpolllim24)
 
+# print dispersion and zero-inflation test results (don't plot for space)
 testDispersion(simoutpolllim24, plot = F)
 testZeroInflation(simoutpolllim24, plot = F)
 
-# # cleanup
+# cleanup
 rm(simoutpolllim, simoutpolllim24, poll.limit.mod, 
     poll.limit.mod24, aov.poll.limit.mod)
 
@@ -954,7 +960,7 @@ pollimplot
 #        filename = "plots/aggregated-pollen-limitation-plot.pdf")
 
 # cleanup
-# rm(pollimplot, pollimsum) 
+rm(pollimplot, pollimsum) 
 
 ```
 
@@ -1100,8 +1106,8 @@ propseed
 # # =============================
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
-ggsave(plot = propseed, width = 6, height = 4,
-       filename = "plots/seed-proportion-plot.pdf")
+# ggsave(plot = propseed, width = 6, height = 4,
+#        filename = "plots/seed-proportion-plot.pdf")
 
 # cleanup
 rm(propseed, propdat)

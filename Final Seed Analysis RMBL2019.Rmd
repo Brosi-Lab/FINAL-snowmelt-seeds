@@ -18,6 +18,15 @@ In this analysis, we assess if the timing of snowmelt impacts seed set in montan
 
 ## Package Installation
 
+* This project uses package management via the `renv` library
+    + more at https://rstudio.github.io/renv/articles/renv.html 
+* **for those collaborating on this package**
+    + the first time you open / run the project, after any and all background code has been run, call `renv::restore()` in the R console; you only have to do this once
+    + anytime you add or remove a package or packages, call `renv::snapshot()` to update the "lockfile" of which packages `renv` is managing; BUT do this only *after* you make sure that all of the packages are playing nicely with one another!!
+    + most of the time, that is all you will need to do
+    + if you do run into package conflicts / issues, you can call `renv::restore()` to go back to the set of packages and versions that you previously were using
+    + for more, see [collaborating with `renv`](https://rstudio.github.io/renv/articles/collaborating.html)
+
 ```{r packages, message = F, results = F, warning = F}
 
 # (note that chunk header is set to not display results / messages / warnings
@@ -30,12 +39,7 @@ rm(list = ls())
 # (ADD / delete the packages you need / don't below!)
 Packages <- c("tidyverse", "knitr", "kableExtra", "glmmTMB", "fitdistrplus", 
               "reshape2", "vegan", "car", "ggpubr", "broom.mixed", "mclogit", 
-              "DHARMa", "gridExtra") 
-
-# # this next line checks to see if all of the packages are installed
-# # if not, it installs them; note `installed.packages()` can be a little slow
-# # keep the code below commented out for faster knitting:
-# install.packages(setdiff(Packages, rownames(installed.packages())), repos = "http://cran.us.r-project.org")
+              "DHARMa", "gridExtra", "renv") 
 
 # this line loads all of the packages:
 lapply(Packages, library, character.only = TRUE)
@@ -45,6 +49,20 @@ options(dplyr.summarise.inform = FALSE)
 
 # format package list for printing below:
 Packages <- paste(Packages, sep = ", ")
+
+# ==========================
+# RENV info
+
+# # SNAPHOT packages for `renv`
+# # if using renv, then run the line of code below whenever packages change
+# # ...but ONLY after making sure that the code is running and packages are
+# # playing nicely with one another
+# renv::snapshot() # leave this commented out, run as needed
+
+# # RESTORE packages using `renv`
+# # only use this if you have added new packages or changed package versions
+# # and your code is now not working
+# renv::restore() # leave this commented out, only use if needed (rare)
 
 ```
 

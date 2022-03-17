@@ -178,9 +178,6 @@ masterdat$site = factor(masterdat$site)
 masterdat$plot.treat = factor(masterdat$plot.treat)
 masterdat$species = factor(masterdat$species)
 
-# remove rows that have no 'number of flowers'
-masterdat = masterdat[!is.na(masterdat$num.flowers),]
-
 # variables to factors
 masterdat$site = factor(masterdat$site)
 masterdat$plot.treat = factor(masterdat$plot.treat)
@@ -528,6 +525,11 @@ reddat$site = factor(reddat$site)
 # to use in the seed proportion analysis:
 seedpropdat = reddat
 
+# remove rows that have no 'number of flowers'
+# we want to keep those in for `seedpropdat`; but our models
+# for community fecundity and pollen limitation include flower num.
+masterdat = masterdat[!is.na(masterdat$num.flowers),]
+
 # limit site-species combos to only those that have
 # a phenological shift; that would focus the data on only where we have the
 # appropriate contrasts. Also limit to site-species combos where there are at
@@ -606,7 +608,7 @@ rm(aov.comm.fec, out.aov.comm.fec)
 * two-way interaction between phenological acceleration and species:
     + indicates that different species respond differently to phenological acceleration
 * three-way interaction between phenological acceleration, species, and flower number:
-    + indicates that not only do different species respond differently to phenological acceleration overall, but also that they have different responses vis-a-vis flower number (in terms of how phenological acceleration changes the slope of the {flower number} - to - {whole plant fidelity} relationship
+    + indicates that not only do different species respond differently to phenological acceleration overall, but also that they have different responses vis-a-vis flower number (in terms of how phenological acceleration changes the slope of the {flower number} - to - {whole plant fecundity} relationship
 * following initial modeling plan, we report on the most complex of these models
 
 #### model assessment community fecundity

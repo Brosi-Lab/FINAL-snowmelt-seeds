@@ -1035,7 +1035,7 @@ polllimplot = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), color 
   facet_wrap(~species, nrow = 1) +
   ylab("log(mean fecundity)") +
   xlab("\nphenological shift (presence/absence)") +
-  ggtitle("Planttreat:Phenshift:Species, no CIs") +
+  ggtitle("Planttreat:Phenshift:Species") +
   theme_light() +
   theme(axis.title.y = element_text(size = 12)) +
   theme(axis.title.x = element_text(size = 12)) +
@@ -1068,6 +1068,8 @@ polllimplotci = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), colo
 # # re-save when this changes, but only as needed
 # ggsave(plot = polllimplot, width = 6, height = 4,
 #        filename = "plots/pollen-limitation-plot.pdf")
+# ggsave(plot = polllimplot, width = 6, height = 4,
+#        filename = "plots/pollen-limitation-plot.jpg")
 
 # cleanup
 rm(sumxpoll, polllimplotci, polllimplot)
@@ -1150,9 +1152,11 @@ propseed
 # # re-save when this changes, but only as needed
 # ggsave(plot = propseed, width = 6, height = 4,
 #        filename = "plots/seed-proportion-plot.pdf")
+# ggsave(plot = propseed, width = 6, height = 4,
+#        filename = "plots/seed-proportion-plot.jpg")
 
 # cleanup
-rm(propseed, propdat)
+# rm(propseed, propdat)
 
 ```
 

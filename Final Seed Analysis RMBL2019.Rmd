@@ -901,10 +901,15 @@ cat("\n model with 2- and 4-way interactions (includes flower number)\n")
 Anova(poll.limit.mod24)
 
 ## use `broom.mixed` package to save model summary as a table
-# saving first model (2- & 3- way interactions only)
+# first model (2- & 3- way interactions)
 aov.poll.limit.mod = Anova(poll.limit.mod)
 aov.poll.limit.mod = tidy(aov.poll.limit.mod)
 write.csv(aov.poll.limit.mod, file = "results/community-pollen-limitation-model-results.csv")
+
+# second model (2- & 4- way interactions)
+aov.poll.limit.mod24 = Anova(poll.limit.mod24)
+aov.poll.limit.mod24 = tidy(aov.poll.limit.mod24)
+write.csv(aov.poll.limit.mod24, file = "results/community-pollen-limitation-model-results-2-4.csv")
 
 # don't cleanup / remove models just yet, need to do assessment on them first
 

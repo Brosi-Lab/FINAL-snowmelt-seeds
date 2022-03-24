@@ -178,12 +178,6 @@ masterdat$site = factor(masterdat$site)
 masterdat$plot.treat = factor(masterdat$plot.treat)
 masterdat$species = factor(masterdat$species)
 
-# =================================
-# # this is where the dropping of rows without flower counts was originally
-# # it is now in the "data prep community fecundity" chunk
-# masterdat = masterdat %>% filter(!(is.na(num.flowers)))
-# =================================
-
 # variables to factors
 masterdat$site = factor(masterdat$site)
 masterdat$plot.treat = factor(masterdat$plot.treat)

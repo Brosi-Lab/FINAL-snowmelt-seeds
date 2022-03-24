@@ -178,6 +178,12 @@ masterdat$site = factor(masterdat$site)
 masterdat$plot.treat = factor(masterdat$plot.treat)
 masterdat$species = factor(masterdat$species)
 
+# =================================
+# # this is where the dropping of rows without flower counts was originally
+# # it is now in the "data prep community fecundity" chunk
+# masterdat = masterdat %>% filter(!(is.na(num.flowers)))
+# =================================
+
 # variables to factors
 masterdat$site = factor(masterdat$site)
 masterdat$plot.treat = factor(masterdat$plot.treat)
@@ -454,6 +460,7 @@ meltphenplot = grid.arrange(plotsnow, meanplotbysite, nrow = 1)
 # # SAVE PLOT: (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
 # ggsave(meltphenplot, file = "plots/meltphenplot.pdf", width = 9, height = 3)
+# ggsave(meltphenplot, file = "plots/meltphenplot.jpg", width = 9, height = 3)
 
 # cleanup
 # includes removing `phenoshift` dataset, not used again
@@ -526,9 +533,10 @@ reddat$site = factor(reddat$site)
 seedpropdat = reddat
 
 # remove rows that have no 'number of flowers'
-# we want to keep those in for `seedpropdat`; but our models
-# for community fecundity and pollen limitation include flower num.
-masterdat = masterdat[!is.na(masterdat$num.flowers),]
+# we want to keep those data for `seedpropdat` (saved in the line above); 
+# but our models for community fecundity and pollen limitation include flower num
+# so need to remove those rows for analyses of community fecundity & poll limit:
+reddat = reddat %>% filter(!(is.na(num.flowers)))
 
 # limit site-species combos to only those that have
 # a phenological shift; that would focus the data on only where we have the
@@ -589,7 +597,8 @@ rm(comm.fec.2) #cleanup
 comm.fec.3 = glmmTMB(totalseeds ~ phenshift.binary/species/num.flowers + (1|site/site.plot), family = nbinom2, ziformula = ~1, data = commfecdat)
 cat("Model with main effect of phenshift, 2-way int b/t phenshift and species, and 3-way int:\n")
 Anova(comm.fec.3)
-# don't cleanup / remove this model just yet (do it below after saving as .csv)
+# don't cleanup / remove this model just yet; need to do model validation
+# and also save model output
 
 ## use `broom.mixed` package to save model summary as a table
 aov.comm.fec = Anova(comm.fec.3)
@@ -597,7 +606,7 @@ out.aov.comm.fec = tidy(aov.comm.fec)
 write.csv(out.aov.comm.fec, file = "results/community-fecundity-model-results.csv")
 
 # cleanup
-# don't cleanup `comm.fec.3` since we need to assess model assumptions
+# don't cleanup `comm.fec.3` since we need to model validation
 rm(aov.comm.fec, out.aov.comm.fec)
 
 ```
@@ -660,6 +669,8 @@ phenfecplot # display in Rmarkdown report
 # # re-save when this changes, but only as needed
 # ggsave(phenfecplot, file = "plots/aggregated-fecundity-by-phenology.pdf",
 #   width = 3, height = 3)
+# ggsave(phenfecplot, file = "plots/aggregated-fecundity-by-phenology.jpg",
+#   width = 3, height = 3)
 
 rm(phenfecplot, phenfecsum) # cleanup
 
@@ -694,7 +705,7 @@ sppfecplot = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), color 
   facet_wrap(~species, nrow = 1) +
   ylab("log(mean fecundity)") + 
   xlab("\nphenological shift (no = control, yes = accelerated)") +
-  ggtitle("Phenology shift by species effects on fecundity") +
+  ggtitle("Phenology shift effects on fecundity by species") +
   theme_light() +
   theme(axis.title.y = element_text(size = 9)) +
   theme(axis.title.x = element_text(size = 9)) +
@@ -715,7 +726,7 @@ sppfecplotci = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), colo
   facet_wrap(~species, nrow = 1) +
   ylab("log(mean fecundity)") +
   xlab("\nphenological shift (no = control, yes = accelerated)") +
-  ggtitle("Phenology shift by species effects on fecundity") +
+  ggtitle("Phenology shift effects on fecundity by species") +
   theme_light() +
   theme(axis.title.y = element_text(size = 9)) +
   theme(axis.title.x = element_text(size = 9)) +
@@ -733,6 +744,8 @@ sppfecplotci = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), colo
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
 # ggsave(sppfecplot, file = "plots/fecundity-by-species-phenology.pdf",
+#    width = 5, height = 3)
+# ggsave(sppfecplot, file = "plots/fecundity-by-species-phenology.jpg",
 #    width = 5, height = 3)
 
 # cleanup
@@ -796,7 +809,9 @@ Fig3
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
 # ggsave(plot = Fig3, width = 9, height = 4, 
-#        filename = "plots/community-fecundity-interactive.pdf")
+#         filename = "plots/community-fecundity-interactive.pdf")
+# ggsave(plot = Fig3, width = 9, height = 4, 
+#         filename = "plots/community-fecundity-interactive.jpg")
 
 # clean up
 rm(Fig3, plotcommunity1, plotcommunity2)
@@ -824,8 +839,14 @@ pollimdat = reddat %>% filter(!(species %in% nohand.spp))
 rm(nohand.spp) #cleanup
 
 # relevel factors to not include missing levels
+# some of this is probably redundant... oh well.
 pollimdat$site = factor(pollimdat$site)
 pollimdat$species = factor(pollimdat$species)
+pollimdat$site.plot = factor(pollimdat$site.plot)
+pollimdat$phenshift.binary = factor(pollimdat$phenshift.binary)
+pollimdat$plant.treat = factor(pollimdat$plant.treat)
+# `num.flowers` as integer
+pollimdat$num.flowers = as.integer(pollimdat$num.flowers)
 
 # limit site-species combos to only those that have
 # a phenological shift; that would focus the data on only where we have the
@@ -839,7 +860,7 @@ pollimdat$species = factor(pollimdat$species)
 # accelerated and not; no further work to do.
 
 # cleanup `reddat`--no longer used
-rm(reddat) 
+rm(reddat)
 
 ```
 
@@ -864,15 +885,20 @@ Finally, following initial model assessment with `DHARMa` we included a zero-inf
 # - ":" specifies the interaction without any main effects
 
 # model with 2- and 3-way interactions (doesn't include flower number):
+# adding in the `control` parameter to avoid "non-positive-definite Hessian"
+# ("BFGS" optimizer):
+# https://cran.r-project.org/web/packages/glmmTMB/vignettes/troubleshooting.html
 poll.limit.mod = glmmTMB(totalseeds ~ (plant.treat:phenshift.binary)/species + 
                   (1|site/site.plot), family = nbinom2, ziformula = ~1,
-                  data = pollimdat)
+                  data = pollimdat, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
 
 # print results in Rmarkdown report
 cat("\n model with 2- and 3-way interactions (doesn't include flower number)\n")
 Anova(poll.limit.mod)
 
 # model with 2- and 4-way interactions (includes flower number)
+# tried the "BFGS" optimizer which was needed above; 
+# but here throws an error, so not using
 poll.limit.mod24 = glmmTMB(totalseeds ~ (plant.treat:phenshift.binary)/(species:num.flowers) + 
                         (1|site/site.plot), family = nbinom2, ziformula = ~1,
                         data = pollimdat)
@@ -893,7 +919,7 @@ write.csv(aov.poll.limit.mod, file = "results/community-pollen-limitation-model-
 in a nutshell:
 
 * 2-way interaction indicates a significant overall effect of pollen limitation and phenological advancement
-    + plot (next code chunk) suggests *greater* pollen limitation (i.e. more negative) under phenological advancement
+    + plot (next code chunk) shows *greater* pollen limitation (i.e. more negative) under phenological advancement
 * 3-way interaction highly significant: this indicates that pollen limitation is different when plants are phenologically shifted vs. not (taking into account plant species)
     + restated, this means that pollen limitation is different depending on whether or not plants were phenologically advanced in different plant species
     + plots are consistent with the idea that directionality of the effect is different depending on species
@@ -978,6 +1004,8 @@ pollimplot
 # # re-save when this changes, but only as needed
 # ggsave(plot = pollimplot, width = 6, height = 4,
 #        filename = "plots/aggregated-pollen-limitation-plot.pdf")
+# ggsave(plot = pollimplot, width = 6, height = 4,
+#        filename = "plots/aggregated-pollen-limitation-plot.jpg")
 
 # cleanup
 rm(pollimplot, pollimsum) 

@@ -383,7 +383,7 @@ plotsnow = ggplot(snowmeltdat, aes(y=sitesort, x=meltday, group = site, color = 
   theme(legend.position = c(0.85, 0.8)) + 
   theme(legend.background = element_rect(linetype="solid", 
                                   colour ="black")) +
-  scale_colour_manual(values=c("orangered3", "darkslategray2"))
+  scale_colour_manual(values=c("orangered3", "steelblue3"))
 
 # display plot
 plotsnow
@@ -646,12 +646,16 @@ phenfecsum = reddat %>% group_by(phenshift.binary) %>%
   summarise(mean.seeds = mean(totalseeds), sd.seeds = sd(totalseeds, na.rm = T), 
         n.plants = n()) %>%  
         mutate(ci.upper = mean.seeds + 1.96*(sd.seeds/sqrt(n.plants))) %>% 
-        mutate(ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants)))
+        mutate(ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants))) %>%
+        mutate(se.lower = mean.seeds - sd.seeds/sqrt(n.plants)) %>%
+        mutate(se.upper = mean.seeds + sd.seeds/sqrt(n.plants))
 
 phenfecplot = ggplot(phenfecsum, aes(x = phenshift.binary, y = mean.seeds, color = phenshift.binary)) +
   geom_point(size = 3) +
-  geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), width = 0.1) + 
-  scale_colour_manual(values=c("darkslategray2", "orangered3")) +
+  # CIs commented out; use SEs instead
+  # geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), width = 0.1) 
+  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0) +
+  scale_colour_manual(values=c("steelblue3", "orangered3")) +
   xlab("phenological acceleration") + 
   ylab("mean whole-plant fecundity") +
   theme(legend.position = "none")
@@ -662,9 +666,9 @@ phenfecplot # display in Rmarkdown report
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
 # ggsave(phenfecplot, file = "plots/aggregated-fecundity-by-phenology.pdf",
-#   width = 3, height = 3)
+#   width = 2.5, height = 3)
 # ggsave(phenfecplot, file = "plots/aggregated-fecundity-by-phenology.jpg",
-#   width = 3, height = 3)
+#   width = 2.5, height = 3)
 
 rm(phenfecplot, phenfecsum) # cleanup
 
@@ -695,7 +699,7 @@ sppfecplot = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), color 
   geom_line(aes(group = species), color = "grey36", arrow = arrow(angle = 30, 
       length = unit(0.07, "inches"), ends = "last", type = "open")) + 
   geom_point(size = 1.7) +
-  scale_colour_manual(values=c("darkslategray2", "orangered3")) +
+  scale_colour_manual(values=c("steelblue3", "orangered3")) +
   facet_wrap(~species, nrow = 1) +
   ylab("log(mean fecundity)") + 
   xlab("\nphenological shift (no = control, yes = accelerated)") +
@@ -715,7 +719,7 @@ sppfecplotci = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), colo
   geom_line(aes(group = species), color = "grey36", arrow = arrow(angle = 30, 
             length = unit(0.07, "inches"), ends = "last", type = "open")) + 
   geom_point(size = 1.7, alpha = 0.8) +
-  scale_colour_manual(values=c("darkslategray2", "orangered3")) +
+  scale_colour_manual(values=c("steelblue3", "orangered3")) +
   geom_errorbar(aes(ymin=log(lower.ci.fecund), ymax=log(upper.ci.fecund)), width=0.2, alpha = 0.5)+
   facet_wrap(~species, nrow = 1) +
   ylab("log(mean fecundity)") +
@@ -764,7 +768,7 @@ plotcommunity1 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1),
   theme(axis.title.x = element_text(size = 12)) +
   theme(axis.text = element_text(size = 12)) +
   theme(strip.text.x = element_text(size = 12, colour = "black")) +
-  scale_colour_manual(values=c("darkslategray2", "orangered3")) +
+  scale_colour_manual(values=c("steelblue3", "orangered3")) +
   theme(legend.position = c(0.85, 0.875)) +
   # theme(legend.background = element_rect(linetype="solid", 
   #                                 colour ="grey36"))

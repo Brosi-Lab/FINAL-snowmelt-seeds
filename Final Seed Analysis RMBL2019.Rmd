@@ -1158,10 +1158,7 @@ combpollimplot
 # ggsave(combpollimplot, file = "plots/combined-poll-lim-plots.pdf", width = 9, height = 4)
 
 # cleanup
-
-# cleanup
-# rm(sumxpoll, polllimplotci, polllimplot)
-
+rm(sumxpoll, polllimplotci, polllimplot, combpollimplot)
 
 ```
 

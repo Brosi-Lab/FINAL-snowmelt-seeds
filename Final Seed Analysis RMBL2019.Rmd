@@ -643,21 +643,27 @@ First, aggregate data to mean per-plant fecundity in each of phenologically acce
 ```{r phenology main effect fecundity plot, message = FALSE}
 
 phenfecsum = reddat %>% group_by(phenshift.binary) %>%
-  summarise(mean.seeds = mean(totalseeds), sd.seeds = sd(totalseeds, na.rm = T), 
-        n.plants = n()) %>%  
-        mutate(ci.upper = mean.seeds + 1.96*(sd.seeds/sqrt(n.plants))) %>% 
-        mutate(ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants))) %>%
-        mutate(se.lower = mean.seeds - sd.seeds/sqrt(n.plants)) %>%
-        mutate(se.upper = mean.seeds + sd.seeds/sqrt(n.plants))
+  summarise(mean.seeds = mean(totalseeds), sd.seeds = sd(totalseeds, 
+                                na.rm = T), n.plants = n()) %>%  
+  # # log version
+  # summarise(mean.seeds = log(mean(totalseeds)), sd.seeds = log(sd(totalseeds, 
+  #                               na.rm = T)), n.plants = n()) %>%  
+        mutate(ci.upper = mean.seeds + 1.96*(sd.seeds/sqrt(n.plants)),
+          ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants)),
+          se.lower = mean.seeds - sd.seeds/sqrt(n.plants),
+          se.upper = mean.seeds + sd.seeds/sqrt(n.plants))
 
 phenfecplot = ggplot(phenfecsum, aes(x = phenshift.binary, y = mean.seeds, color = phenshift.binary)) +
   geom_point(size = 3) +
   # CIs commented out; use SEs instead
   # geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), width = 0.1) 
-  geom_errorbar(aes(ymin = se.lower, ymax = se.upper), width = 0) +
+  geom_linerange(aes(ymin = se.lower, ymax = se.upper), size = 0.75) +
   scale_colour_manual(values=c("steelblue3", "orangered3")) +
   xlab("phenological acceleration") + 
   ylab("mean whole-plant fecundity") +
+  # # log version
+  # ylab("log(mean whole-plant fecundity)") +
+  theme_light() +
   theme(legend.position = "none")
 
 phenfecplot # display in Rmarkdown report
@@ -670,7 +676,7 @@ phenfecplot # display in Rmarkdown report
 # ggsave(phenfecplot, file = "plots/aggregated-fecundity-by-phenology.jpg",
 #   width = 2.5, height = 3)
 
-rm(phenfecplot, phenfecsum) # cleanup
+# don't cleanup just yet, need to combine plots first
 
 ```
 
@@ -692,7 +698,9 @@ sumsppfec = commfecdat %>%
          # this is more conservative than using a Gaussian / z-dist
          # e.g., in lowest sample size (14), it is 2.16 rather than 1.96
          lower.ci.fecund = meanfecund - qt(1 - (0.05 / 2), nfecund - 1) * sefecund,
-         upper.ci.fecund = meanfecund + qt(1 - (0.05 / 2), nfecund - 1) * sefecund)
+         upper.ci.fecund = meanfecund + qt(1 - (0.05 / 2), nfecund - 1) * sefecund,
+         lower.se.fecund = meanfecund - sefecund,
+         upper.se.fecund = meanfecund + sefecund)
 
 # plot without confidence intervals:
 sppfecplot = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), color = phenshift.binary)) +
@@ -711,20 +719,22 @@ sppfecplot = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), color 
   theme(strip.text.x = element_text(size = 9, colour = "black")) + 
   theme(legend.position = "none")
 
-# display plot
-sppfecplot 
+# # display plot
+# # (commented out for this report)
+# sppfecplot 
 
 # plot with confidence intervals:
 sppfecplotci = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), color = phenshift.binary)) +
-  geom_line(aes(group = species), color = "grey36", arrow = arrow(angle = 30, 
-            length = unit(0.07, "inches"), ends = "last", type = "open")) + 
-  geom_point(size = 1.7, alpha = 0.8) +
-  scale_colour_manual(values=c("steelblue3", "orangered3")) +
-  geom_errorbar(aes(ymin=log(lower.ci.fecund), ymax=log(upper.ci.fecund)), width=0.2, alpha = 0.5)+
+  geom_line(aes(group = species), color = "grey36") + 
+  # , arrow = arrow(angle = 30, length = unit(0.07, "inches"), ends = "last", type = "open")) + 
+  geom_point(size = 1.7) + 
+  scale_colour_manual(values = c("steelblue3", "orangered3")) +
+  geom_linerange(aes(ymin = log(lower.se.fecund), ymax = log(upper.se.fecund)), 
+                size = 0.75) +
   facet_wrap(~species, nrow = 1) +
   ylab("log(mean fecundity)") +
-  xlab("\nphenological shift (no = control, yes = accelerated)") +
-  ggtitle("Phenology shift effects on fecundity by species") +
+  xlab("\nphenological acceleration") +
+  # ggtitle("Phenology shift effects on fecundity by species") +
   theme_light() +
   theme(axis.title.y = element_text(size = 9)) +
   theme(axis.title.x = element_text(size = 9)) +
@@ -733,23 +743,48 @@ sppfecplotci = ggplot(sumsppfec, aes(x=phenshift.binary, y=log(meanfecund), colo
   theme(legend.position = "none")
 
 # # display plot with CIs
-# # (commented out for this report)
-# sppfecplotci
+sppfecplotci
 
 # # SAVE PLOT
 # # =============================
 # # for now, the one without CIs
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
-# ggsave(sppfecplot, file = "plots/fecundity-by-species-phenology.pdf",
-#    width = 5, height = 3)
-# ggsave(sppfecplot, file = "plots/fecundity-by-species-phenology.jpg",
-#    width = 5, height = 3)
+ggsave(sppfecplotci, file = "plots/fecundity-by-species-phenology.pdf",
+   width = 5, height = 3)
+ggsave(sppfecplotci, file = "plots/fecundity-by-species-phenology.jpg",
+   width = 5, height = 3)
 
-# cleanup
-rm(sumsppfec, sppfecplot, sppfecplotci)
+# don't cleanup just yet, need to combine plots first
 
 ```
+
+#### combine plots (main effect + 2-way interaction) 
+
+```{r combine fecundity plots}
+
+combfecplot = ggarrange(phenfecplot, sppfecplotci,
+          widths = c(1.75, 5),
+          labels = c("A", "B"),
+          # next two lines adjust label {"A", "B"} position
+          hjust = c(-2, -1.25),
+          vjust = 1.5,
+          ncol = 2, nrow = 1,
+          align = "v")
+
+# display combined plot
+combfecplot
+
+# # save plots (uncomment and run only when needed)
+# ggsave(combfecplot, file = "plots/combined-fecundity-plots.jpg", width = 9, height = 4)
+# ggsave(combfecplot, file = "plots/combined-fecundity-plots.pdf", width = 9, height = 4)
+
+# cleanup
+# rm(sumsppfec, sppfecplot, sppfecplotci)
+# rm(phenfecplot, phenfecsum)
+
+```
+
 
 #### plot interactive effects of phenology shift on fecundity
 
@@ -773,7 +808,6 @@ plotcommunity1 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1),
   # theme(legend.background = element_rect(linetype="solid", 
   #                                 colour ="grey36"))
   theme(legend.background = element_rect(fill = "transparent", colour = "transparent"))
-  
   
 # Plot fecundity by flower number, species separated by color:
 plotcommunity2 = ggplot(commfecdat, aes(x=log(num.flowers), y=log(totalseeds+1), 
@@ -858,7 +892,7 @@ pollimdat$num.flowers = as.integer(pollimdat$num.flowers)
 # accelerated and not; no further work to do.
 
 # cleanup `reddat`--no longer used
-rm(reddat)
+# rm(reddat)
 
 ```
 
@@ -983,19 +1017,25 @@ looks problematic in terms of residuals vs. predicted values; probably best to s
 pollimsum = pollimdat %>% group_by(phenshift.binary, plant.treat) %>%
   summarise(mean.seeds = mean(totalseeds), sd.seeds = sd(totalseeds, na.rm = T), 
         n.plants = n()) %>% 
-        mutate(ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants))) %>% 
-        mutate(ci.upper = mean.seeds + 1.96*(sd.seeds/sqrt(n.plants)))
+        mutate(ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants)),
+          ci.upper = mean.seeds + 1.96*(sd.seeds/sqrt(n.plants)),
+          se.lower = mean.seeds - (sd.seeds/sqrt(n.plants)),
+          se.upper = mean.seeds + (sd.seeds/sqrt(n.plants)))
 
 pollimplot = ggplot(pollimsum, aes(x = phenshift.binary, y = mean.seeds, 
                                    color = plant.treat)) +
-  geom_point(aes(group = plant.treat), size = 3) +
-  geom_line(aes(group = plant.treat)) + 
+  geom_point(aes(group = plant.treat), 
+             position = position_dodge(width=0.2), size = 3) +
+  geom_line(aes(group = plant.treat), position = position_dodge(width=0.2)) + 
   scale_colour_manual(values=c("gray36", "darkgoldenrod1")) + 
   # # (to add CIs, un-comment the two lines below:)
-  # geom_errorbar(aes(ymin = ci.lower, ymax = ci.upper), width = 0.1) + 
+  geom_linerange(aes(ymin = se.lower, ymax = se.upper), 
+                position = position_dodge(width=0.2), size = 0.75) + 
   # scale_colour_manual(values=c("bisque4", "chartreuse2")) +
   xlab("phenological acceleration") + 
-  ylab("mean whole-plant fecundity")
+  ylab("mean whole-plant fecundity") + 
+  theme_light() + 
+  theme(legend.position="none")
 
 # display in Rmarkdown report
 pollimplot 
@@ -1005,19 +1045,19 @@ pollimplot
 # # for now, the one without CIs
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
-# ggsave(plot = pollimplot, width = 6, height = 4,
-#        filename = "plots/aggregated-pollen-limitation-plot.pdf")
-# ggsave(plot = pollimplot, width = 6, height = 4,
-#        filename = "plots/aggregated-pollen-limitation-plot.jpg")
+ggsave(plot = pollimplot, width = 4, height = 4,
+       filename = "plots/aggregated-pollen-limitation-plot.pdf")
+ggsave(plot = pollimplot, width = 4, height = 4,
+       filename = "plots/aggregated-pollen-limitation-plot.jpg")
 
 # cleanup
-rm(pollimplot, pollimsum) 
+# rm(pollimplot, pollimsum) 
 
 ```
 
 Again, this plot suggests that experimental phenological acceleration increases pollen limitation, i.e. the difference between hand-pollinated (no pollen limitation) and open-pollinated (with possible pollen-limitation) is greater in plants with phenological acceleration relative to those without.
 
-Somewhat surprising that open-pollinated plants produced on average more seeds in the open treatment when not phenologically advanced (left-hand points), but that difference may not be statistically meaningful (again, confidence intervals are likely to be huge given site and species specific differences, and also unlikely to be helpful in interpretation here).
+Somewhat surprising that open-pollinated plants produced on average more seeds in the open treatment when not phenologically advanced (left-hand points), but that difference may not be statistically meaningful. It is unsurprising that the error bars are large given site- and species-specific differences.
 
 #### plot by species pollen limitation
 
@@ -1035,12 +1075,15 @@ sumxpoll = pollimdat %>%
          # this is more conservative than using a Gaussian / z-dist
          # e.g., in lowest sample size (14), quartile is 2.16 rather than 1.96
          lower.ci.fecund = meanfecund - qt(1 - (0.05 / 2), nfecund - 1) * sefecund,
-         upper.ci.fecund = meanfecund + qt(1 - (0.05 / 2), nfecund - 1) * sefecund)
+         upper.ci.fecund = meanfecund + qt(1 - (0.05 / 2), nfecund - 1) * sefecund,
+         lower.se.fecund = meanfecund - sefecund,
+         upper.se.fecund = meanfecund + sefecund)
 
 # plot without confidence intervals:
 polllimplot = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), color = plant.treat)) +
-  geom_point(data = sumxpoll, size = 1.7, alpha = 0.8) +
-  geom_line(aes(group = plant.treat)) +
+  geom_point(data = sumxpoll, size = 1.7, alpha = 0.8,
+             position = position_dodge(width=0.2)) +
+  geom_line(aes(group = plant.treat), position = position_dodge(width=0.2)) +
   facet_wrap(~species, nrow = 1) +
   ylab("log(mean fecundity)") +
   xlab("\nphenological shift (presence/absence)") +
@@ -1052,23 +1095,34 @@ polllimplot = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), color 
   theme(strip.text.x = element_text(size = 12, colour = "black")) + 
   scale_colour_manual(values=c("gray36", "darkgoldenrod1"))
 
-polllimplot # display plot
+# # display plot
+# # leave commented out for this version
+# polllimplot 
 
 # plot with confidence intervals:
-polllimplotci = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), color = plant.treat)) +
-  geom_point(data = sumxpoll, size = 1.7, alpha = 0.8) +
-  geom_line(aes(group = plant.treat)) +
-  geom_errorbar(aes(ymin=log(lower.ci.fecund), ymax=log(upper.ci.fecund)), width=0.2, alpha = 0.5)+
+polllimplotci = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), 
+                                     color = plant.treat)) +
+  geom_line(aes(group = plant.treat), position = position_dodge(width=0.2)) +
+  geom_linerange(aes(ymin=log(lower.se.fecund), ymax=log(upper.se.fecund)), 
+                size = 0.75, position = position_dodge(width=0.2)) +
+  geom_point(data = sumxpoll, size = 1.7, alpha = 0.8, 
+             position = position_dodge(width=0.2)) +
   facet_wrap(~species, nrow = 1) +
   ylab("log(mean fecundity)") +
-  xlab("\nphenological shift (presence/absence)") +
-  ggtitle("Planttreat:Phenshift:Species, with CIs") +
+  xlab("\nphenological acceleration") +
+  # ggtitle("Planttreat:Phenshift:Species, with CIs") +
   theme_light() +
   theme(axis.title.y = element_text(size = 12)) +
   theme(axis.title.x = element_text(size = 12)) +
   theme(axis.text = element_text(size = 10)) +
   theme(strip.text.x = element_text(size = 12, colour = "black")) + 
-  scale_colour_manual(values=c("gray36", "darkgoldenrod1"))
+  scale_colour_manual(values=c("gray36", "darkgoldenrod1")) + 
+  theme(legend.position = c(0.8, 0.2)) + 
+  theme(legend.background = element_rect(linetype="solid", 
+                                  colour ="black"))
+
+# display plot
+polllimplotci
 
 # # SAVE PLOT
 # # =============================
@@ -1080,10 +1134,37 @@ polllimplotci = ggplot(sumxpoll, aes(x=phenshift.binary, y=log(meanfecund), colo
 # ggsave(plot = polllimplot, width = 6, height = 4,
 #        filename = "plots/pollen-limitation-plot.jpg")
 
-# cleanup
-rm(sumxpoll, polllimplotci, polllimplot)
 
 ```
+
+#### combine pollen limitation plots
+
+```{r combine pollen limitation plots}
+
+combpollimplot = ggarrange(pollimplot, polllimplotci,
+          widths = c(1.75, 4),
+          labels = c("A", "B"),
+          # next two lines adjust label {"A", "B"} position
+          hjust = c(-0.5, -1.25),
+          vjust = 1.5,
+          ncol = 2, nrow = 1,
+          align = "v")
+
+# display combined plot
+combpollimplot
+
+# # save plots (uncomment and run only when needed)
+# ggsave(combpollimplot, file = "plots/combined-poll-lim-plots.jpg", width = 9, height = 4)
+# ggsave(combpollimplot, file = "plots/combined-poll-lim-plots.pdf", width = 9, height = 4)
+
+# cleanup
+
+# cleanup
+# rm(sumxpoll, polllimplotci, polllimplot)
+
+
+```
+
 
 
 ## Mixed conditional logit model (relative proportions of seed output)

@@ -761,7 +761,7 @@ ggsave(sppfecplotci, file = "plots/fecundity-by-species-phenology.jpg",
 
 #### combine plots (main effect + 2-way interaction) 
 
-```{r combine fecundity plots}
+```{r combine fecundity plots, warning = F}
 
 combfecplot = ggarrange(phenfecplot, sppfecplotci,
           widths = c(1.75, 5),
@@ -780,8 +780,7 @@ combfecplot
 # ggsave(combfecplot, file = "plots/combined-fecundity-plots.pdf", width = 9, height = 4)
 
 # cleanup
-# rm(sumsppfec, sppfecplot, sppfecplotci)
-# rm(phenfecplot, phenfecsum)
+rm(sumsppfec, sppfecplot, sppfecplotci, phenfecplot, phenfecsum, combfecplot)
 
 ```
 
@@ -892,7 +891,7 @@ pollimdat$num.flowers = as.integer(pollimdat$num.flowers)
 # accelerated and not; no further work to do.
 
 # cleanup `reddat`--no longer used
-# rm(reddat)
+rm(reddat)
 
 ```
 
@@ -998,7 +997,7 @@ testZeroInflation(simoutpolllim24, plot = F)
 
 # cleanup
 rm(simoutpolllim, simoutpolllim24, poll.limit.mod, 
-    poll.limit.mod24, aov.poll.limit.mod)
+    poll.limit.mod24, aov.poll.limit.mod, aov.poll.limit.mod24)
 
 ```
 
@@ -1050,8 +1049,7 @@ ggsave(plot = pollimplot, width = 4, height = 4,
 ggsave(plot = pollimplot, width = 4, height = 4,
        filename = "plots/aggregated-pollen-limitation-plot.jpg")
 
-# cleanup
-# rm(pollimplot, pollimsum) 
+# don't cleanup yet; need to combine plots below
 
 ```
 
@@ -1139,7 +1137,7 @@ polllimplotci
 
 #### combine pollen limitation plots
 
-```{r combine pollen limitation plots}
+```{r combine pollen limitation plots, warning = F}
 
 combpollimplot = ggarrange(pollimplot, polllimplotci,
           widths = c(1.75, 4),
@@ -1158,7 +1156,7 @@ combpollimplot
 # ggsave(combpollimplot, file = "plots/combined-poll-lim-plots.pdf", width = 9, height = 4)
 
 # cleanup
-rm(sumxpoll, polllimplotci, polllimplot, combpollimplot)
+rm(sumxpoll, polllimplotci, pollimplot, polllimplot, combpollimplot, pollimsum)
 
 ```
 
@@ -1243,7 +1241,7 @@ propseed
 #        filename = "plots/seed-proportion-plot.jpg")
 
 # cleanup
-# rm(propseed, propdat)
+rm(propseed, propdat)
 
 ```
 

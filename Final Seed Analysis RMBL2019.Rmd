@@ -750,10 +750,10 @@ sppfecplotci
 # # for now, the one without CIs
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
-ggsave(sppfecplotci, file = "plots/fecundity-by-species-phenology.pdf",
-   width = 5, height = 3)
-ggsave(sppfecplotci, file = "plots/fecundity-by-species-phenology.jpg",
-   width = 5, height = 3)
+# ggsave(sppfecplotci, file = "plots/fecundity-by-species-phenology.pdf",
+#    width = 5, height = 3)
+# ggsave(sppfecplotci, file = "plots/fecundity-by-species-phenology.jpg",
+#    width = 5, height = 3)
 
 # don't cleanup just yet, need to combine plots first
 
@@ -1044,10 +1044,10 @@ pollimplot
 # # for now, the one without CIs
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
-ggsave(plot = pollimplot, width = 4, height = 4,
-       filename = "plots/aggregated-pollen-limitation-plot.pdf")
-ggsave(plot = pollimplot, width = 4, height = 4,
-       filename = "plots/aggregated-pollen-limitation-plot.jpg")
+# ggsave(plot = pollimplot, width = 4, height = 4,
+#        filename = "plots/aggregated-pollen-limitation-plot.pdf")
+# ggsave(plot = pollimplot, width = 4, height = 4,
+#        filename = "plots/aggregated-pollen-limitation-plot.jpg")
 
 # don't cleanup yet; need to combine plots below
 

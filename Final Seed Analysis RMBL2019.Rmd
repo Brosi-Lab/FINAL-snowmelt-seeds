@@ -372,9 +372,12 @@ snowmeltdat$sitesort = factor(snowmeltdat$site, levels=c("Pfeiler",
          ))
 
 # Plot
-plotsnow = ggplot(snowmeltdat, aes(y=sitesort, x=meltday, group = site, color = plot.treat)) + 
+plotsnow = ggplot(snowmeltdat, aes(y=sitesort, x=meltday, group = site, 
+                                   color = plot.treat)) + 
   geom_point(size = 4) +
-  geom_line(color = "black", arrow = arrow(angle = 30, length = unit(0.09, "inches"), ends = "first", type = "open")) + 
+  geom_line(color = "black", 
+            arrow = arrow(angle = 30, length = unit(0.09, "inches"), 
+                          ends = "first", type = "open")) + 
   theme_light() +
   xlab("Julian day snow free") + ylab("sites") +
   theme(axis.title.y = element_text(size = 10)) +
@@ -384,7 +387,8 @@ plotsnow = ggplot(snowmeltdat, aes(y=sitesort, x=meltday, group = site, color = 
   theme(legend.background = element_rect(linetype="solid", 
                                   colour ="black")) +
   scale_colour_manual(values=c("orangered3", "steelblue3")) + 
-  labs(color = "treatment")
+  labs(color = "treatment") + 
+  scale_y_discrete(labels = c("PF", "BB", "403B", "RG", "MR", "AP", "WG3C", "SF"))
 
 # display plot
 plotsnow
@@ -454,8 +458,8 @@ meltphenplot = grid.arrange(plotsnow, meanplotbysite, nrow = 1)
 
 # # SAVE PLOT: (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
-# ggsave(meltphenplot, file = "plots/meltphenplot.pdf", width = 9, height = 3)
-# ggsave(meltphenplot, file = "plots/meltphenplot.jpg", width = 9, height = 3)
+ggsave(meltphenplot, file = "plots/meltphenplot.pdf", width = 9, height = 3)
+ggsave(meltphenplot, file = "plots/meltphenplot.jpg", width = 9, height = 3)
 
 # cleanup
 # includes removing `phenoshift` dataset, not used again

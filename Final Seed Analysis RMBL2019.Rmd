@@ -356,7 +356,7 @@ The seed data generally fit a negative binomial distribution much better than a 
 
 #### Snowmelt plot
 
-Here's a plot of the Julian days that the snowmelt-accelerated plots melted out, with sites sorted by magnitude of snowmelt acceleration:
+Here's a plot of the Julian days that the snowmelt-accelerated plots melted out, with sites sorted by snowmelt day in the control plots:
 
 ```{r Plot meltout dates by plot, eval = T, echo = FALSE}
 
@@ -571,9 +571,11 @@ commfecdat = subset(reddat, reddat$plant.treat != "open-hand")
 
 ### models community fecundity
 
-need to include in the model random effects specification that there are plots (control vs. manip) nested within each site; add these in as a random effect (random intercept), nested within site: `(1|site/site.plot)`
+Included in the model random effects specification: there are plots (control vs. manip) nested within each site; add these in as a random effect (random intercept), nested within site: `(1|site/site.plot)`
 
 After model assessment using `DHARMA`, initial models showed significant zero-inflation (i.e. more plants with zero seeds than expected with the fitted negative binomial distribution), but no other issues. The updated models below include a zero-inflation term and do not show any particular issues in terms of model assumptions; see next section ("model assessment") for more detail.
+
+We display here only the final model, with the 3-way interaction; main effect of phenological shift; and a two-way interaction between phenological shift and plant species).
 
 ```{r models community fecundity}
 
@@ -582,14 +584,14 @@ After model assessment using `DHARMA`, initial models showed significant zero-in
 
 # model with *just* the 3-way interaction:
 comm.fec = glmmTMB(totalseeds ~ phenshift.binary:species:num.flowers + (1|site/site.plot), family = nbinom2, ziformula = ~1, data = commfecdat)
-cat("Model with 3-way interaction only:\n")
-Anova(comm.fec)
+# cat("Model with 3-way interaction only:\n")
+# Anova(comm.fec)
 rm(comm.fec) #cleanup
 
 # model with the 3-way interaction plus the main effect of phenshift:
 comm.fec.2 = glmmTMB(totalseeds ~ phenshift.binary/species:num.flowers + (1|site/site.plot), family = nbinom2, ziformula = ~1, data = commfecdat)
-cat("Model with 3-way interaction plus the main effect of phenshift:\n")
-Anova(comm.fec.2)
+# cat("Model with 3-way interaction plus the main effect of phenshift:\n")
+# Anova(comm.fec.2)
 rm(comm.fec.2) #cleanup
 
 # model with main effect of phenshift, 2-way interaction between phenshift and species, and 3-way interaction

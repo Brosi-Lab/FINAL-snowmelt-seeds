@@ -675,6 +675,9 @@ phenfecplot = ggplot(phenfecsum, aes(x = phenshift.binary, y = mean.seeds, color
 
 phenfecplot # display in Rmarkdown report
 
+# calculate effect size:
+fecund.effect.size = 1- (phenfecsum$mean.seeds[2]/phenfecsum$mean.seeds[1])
+
 # # save plot
 # # (keep this commented out to prevent repeated saving on GitHub)
 # # re-save when this changes, but only as needed
@@ -688,6 +691,8 @@ phenfecplot # display in Rmarkdown report
 ```
 
 Indicates that there is an *overall reduction in fecundity* across the community in plants phenologically shifted vs. not, i.e. a **negative directional impact of phenological acceleration** on whole-plant fecundity.
+
+The effect size of the reduction in fecundity is a `R fecund.effect.size`% reduction in overall seed production in the accelerated plots relative to control. 
 
 Note: as in any mixed-effects model, the lack of overlap in confidence intervals cannot be interpreted to mean lack of statistical significance, because of variation in random effects. For example, sites likely have different whole-plant fecundity means if they vary in soil moisture, soil nutrients, shading, etc.; and that variation can be of similar magnitude or greater than the effect size of the main effects. 
 

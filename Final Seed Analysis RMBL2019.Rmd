@@ -974,7 +974,7 @@ in a nutshell:
 * 4-way interaction also highly significant: 
     + this basically means the same thing as the 3-way, but also that phenological advancement affects pollen limitation "accumulation" with flower number differently in different species (also unsurprising)
 
-### models of community-wide pollen limitation updated
+### updated models of community-wide pollen limitation
 
 After plotting these models (below), it is clear that the hand-pollination treatments did not work for `Mefu` or for `Lile`; instead, the hand-pollinated plants always produced fewer seeds than the open-pollinated plants in both treatment and control plots. Since it was our experimental manipulation of these plants that failed, it seems clear that we should remove those species from this analysis as they could obfuscate results. This will leave us unfortunately with only 3 species, but it still seems worth assessing those combined.
 
@@ -986,7 +986,7 @@ After plotting these models (below), it is clear that the hand-pollination treat
 # - ":" specifies the interaction without any main effects
 
 # REMOVE MEFU AND LILE:
-pollimdat = pollimdat %>% filter(species != "Mefu" & species != "Lile")
+pollimdat.up = pollimdat %>% filter(species != "Mefu" & species != "Lile")
 
 # model with 2- and 3-way interactions (doesn't include flower number):
 # adding in the `control` parameter to avoid "non-positive-definite Hessian"
@@ -994,7 +994,7 @@ pollimdat = pollimdat %>% filter(species != "Mefu" & species != "Lile")
 # https://cran.r-project.org/web/packages/glmmTMB/vignettes/troubleshooting.html
 poll.limit.mod.up = glmmTMB(totalseeds ~ (plant.treat:phenshift.binary)/species + 
                   (1|site/site.plot), family = nbinom2, ziformula = ~1,
-                  data = pollimdat, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
+                  data = pollimdat.up, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
 
 # print results in Rmarkdown report
 cat("\n model with 2- and 3-way interactions (doesn't include flower number)\n")
@@ -1163,6 +1163,56 @@ pollimplot
 Again, this plot suggests that experimental phenological acceleration increases pollen limitation, i.e. the difference between hand-pollinated (no pollen limitation) and open-pollinated (with possible pollen-limitation) is greater in plants with phenological acceleration relative to those without.
 
 Somewhat surprising that open-pollinated plants produced on average more seeds in the open treatment when not phenologically advanced (left-hand points), but that difference may not be statistically meaningful. It is unsurprising that the error bars are large given site- and species-specific differences.
+
+#### UPDATED plot summarized community pollen limitation
+
+* difference with the above is that this one does not include Mefu or Lile, since the hand-pollination experiments did not function as expected in those species
+* here plotting the 2-way interaction between `plot.treat` (hand-pollinated vs. open-pollinated) and `phenshift.binary` (whether or not a plant in a plot had been experimentally phenologically advanced)
+* this plot is to aid in the interpretation of the 2-way statistical interaction
+* going to plot means only; the CIs are not likely to be informative here given potential differences in sites and species composition (as is typically the case with GLMMs)
+
+```{r community pollen limitation plot, message = FALSE}
+
+pollimsum.up = pollimdat.up %>% group_by(phenshift.binary, plant.treat) %>%
+  summarise(mean.seeds = mean(totalseeds), sd.seeds = sd(totalseeds, na.rm = T), 
+        n.plants = n()) %>% 
+        mutate(ci.lower = mean.seeds - 1.96*(sd.seeds/sqrt(n.plants)),
+          ci.upper = mean.seeds + 1.96*(sd.seeds/sqrt(n.plants)),
+          se.lower = mean.seeds - (sd.seeds/sqrt(n.plants)),
+          se.upper = mean.seeds + (sd.seeds/sqrt(n.plants)))
+
+pollimplot.up = ggplot(pollimsum.up, aes(x = phenshift.binary, y = mean.seeds, 
+                                   color = plant.treat)) +
+  geom_point(aes(group = plant.treat), 
+             position = position_dodge(width=0.2), size = 3) +
+  geom_line(aes(group = plant.treat), position = position_dodge(width=0.2)) + 
+  scale_colour_manual(values=c("gray36", "darkgoldenrod1")) + 
+  # # (to add CIs, un-comment the two lines below:)
+  geom_linerange(aes(ymin = se.lower, ymax = se.upper), 
+                position = position_dodge(width=0.2), size = 0.75) + 
+  # scale_colour_manual(values=c("bisque4", "chartreuse2")) +
+  xlab("phenological acceleration") + 
+  ylab("mean whole-plant fecundity") + 
+  theme_light() + 
+  theme(legend.position="none")
+
+# display in Rmarkdown report
+pollimplot.up
+
+# # SAVE PLOT
+# # =============================
+# # for now, the one without CIs
+# # (keep this commented out to prevent repeated saving on GitHub)
+# # re-save when this changes, but only as needed
+# ggsave(plot = pollimplot.up, width = 4, height = 4,
+#        filename = "plots/aggregated-pollen-limitation-plot-updated.pdf")
+# ggsave(plot = pollimplot.up, width = 4, height = 4,
+#        filename = "plots/aggregated-pollen-limitation-plot-updated.jpg")
+
+# don't cleanup yet; need to combine plots below
+
+```
+
 
 #### plot by species pollen limitation
 

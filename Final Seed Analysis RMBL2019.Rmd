@@ -692,7 +692,7 @@ fecund.effect.size = 1- (phenfecsum$mean.seeds[2]/phenfecsum$mean.seeds[1])
 
 Indicates that there is an *overall reduction in fecundity* across the community in plants phenologically shifted vs. not, i.e. a **negative directional impact of phenological acceleration** on whole-plant fecundity.
 
-The effect size of the reduction in fecundity is a `R fecund.effect.size`% reduction in overall seed production in the accelerated plots relative to control. 
+The effect size of the reduction in fecundity is a `R round(fecund.effect.size,3)`% reduction in overall seed production in the accelerated plots relative to control. 
 
 Note: as in any mixed-effects model, the lack of overlap in confidence intervals cannot be interpreted to mean lack of statistical significance, because of variation in random effects. For example, sites likely have different whole-plant fecundity means if they vary in soil moisture, soil nutrients, shading, etc.; and that variation can be of similar magnitude or greater than the effect size of the main effects. 
 
@@ -907,7 +907,7 @@ rm(reddat)
 
 ```
 
-### models of community-wide pollen limitation
+### models of community-wide pollen limitation initial
 
 * follow general analysis plan for community-wide seed set; use only data from non-selfers
 * include `plant.treat` (`open.hand` vs. `open`) as an interaction
@@ -974,6 +974,57 @@ in a nutshell:
 * 4-way interaction also highly significant: 
     + this basically means the same thing as the 3-way, but also that phenological advancement affects pollen limitation "accumulation" with flower number differently in different species (also unsurprising)
 
+### models of community-wide pollen limitation updated
+
+After plotting these models (below), it is clear that the hand-pollination treatments did not work for `Mefu` or for `Lile`; instead, the hand-pollinated plants always produced fewer seeds than the open-pollinated plants in both treatment and control plots. Since it was our experimental manipulation of these plants that failed, it seems clear that we should remove those species from this analysis as they could obfuscate results. This will leave us unfortunately with only 3 species, but it still seems worth assessing those combined.
+
+```{r models of community-wide pollen limitation updated}
+
+# these models were tricky to specify syntactically... remember:
+# - "*" specifies an interaction and both associated main effects
+# - "/" specifies an interaction and main effect only on the left
+# - ":" specifies the interaction without any main effects
+
+# REMOVE MEFU AND LILE:
+pollimdat = pollimdat %>% filter(species != "Mefu" & species != "Lile")
+
+# model with 2- and 3-way interactions (doesn't include flower number):
+# adding in the `control` parameter to avoid "non-positive-definite Hessian"
+# ("BFGS" optimizer):
+# https://cran.r-project.org/web/packages/glmmTMB/vignettes/troubleshooting.html
+poll.limit.mod.up = glmmTMB(totalseeds ~ (plant.treat:phenshift.binary)/species + 
+                  (1|site/site.plot), family = nbinom2, ziformula = ~1,
+                  data = pollimdat, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
+
+# print results in Rmarkdown report
+cat("\n model with 2- and 3-way interactions (doesn't include flower number)\n")
+Anova(poll.limit.mod.up)
+
+# model with 2- and 4-way interactions (includes flower number)
+# tried the "BFGS" optimizer which was needed above; 
+# but here throws an error, so not using
+poll.limit.mod24.up = glmmTMB(totalseeds ~ (plant.treat:phenshift.binary)/(species:num.flowers) + 
+                        (1|site/site.plot), family = nbinom2, ziformula = ~1,
+                        data = pollimdat)
+# print results in Rmarkdown report
+cat("\n model with 2- and 4-way interactions (includes flower number)\n")
+Anova(poll.limit.mod24.up)
+
+## use `broom.mixed` package to save model summary as a table
+# first model (2- & 3- way interactions)
+aov.poll.limit.mod.up = Anova(poll.limit.mod.up)
+aov.poll.limit.mod.up = tidy(aov.poll.limit.mod.up)
+write.csv(aov.poll.limit.mod.up, file = "results/community-pollen-limitation-model-UPDATED-results.csv")
+
+# second model (2- & 4- way interactions)
+aov.poll.limit.mod24.up = Anova(poll.limit.mod24.up)
+aov.poll.limit.mod24.up = tidy(aov.poll.limit.mod24.up)
+write.csv(aov.poll.limit.mod24.up, file = "results/community-pollen-limitation-model-UPDATED-results-2-4.csv")
+
+# don't cleanup / remove models just yet, need to do assessment on them first
+
+```
+
 #### model assessment pollen limitation
 
 Assess model residuals to see if the model meets basic statistical assumptions, using the `DHARMa` package. Also asssess dispersion (over- and under-dispersion) and zero-inflation. Trying this out for both models, those with 3-way and with 4-way interactions.
@@ -1013,7 +1064,51 @@ rm(simoutpolllim, simoutpolllim24, poll.limit.mod,
 
 ```
 
-looks problematic in terms of residuals vs. predicted values; probably best to stick to reporting the simpler model with 2- and 3-way interactions.
+looks problematic in terms of residuals vs. predicted values; stick to reporting the simpler model with 2- and 3-way interactions.
+
+#### model assessment pollen limitation UPDATED
+
+This section reports on model validation for the pollen limitation models with "Lile" and "Mefu" removed (since the hand-pollination treatments did not work on those species)
+
+Assess model residuals to see if the model meets basic statistical assumptions, using the `DHARMa` package. Also asssess dispersion (over- and under-dispersion) and zero-inflation. Trying this out for both models, those with 3-way and with 4-way interactions.
+
+**updated model with 2- and 3- way interactions:**
+
+```{r model assessment pollen limitation 23 updated}
+
+# simulate residuals using DHARMa
+# "simoutpollim" = simulation output, pollen limitation models
+# (with 2- and 3-way interactions)
+simoutpolllim <- simulateResiduals(fittedModel = poll.limit.mod.up, plot = F)
+plot(simoutpolllim)
+
+# print dispersion and zero-inflation test results (don't plot for space)
+testDispersion(simoutpolllim, plot = F)
+testZeroInflation(simoutpolllim, plot = F)
+```
+while plots aren't the cleanest, no obvious issues and dispersion test and overdispersion tests not significant---feel comfortable reporting on these models.
+
+**updated model with 2- and 4- way interactions:**
+
+again, without "Lile" and "Mefu"
+
+```{r model assessment pollen limitation 24}
+# "simoutpollim24" = simulation output, pollen limitation models 
+# (with 2- and 4-way interactions)
+simoutpolllim24 <- simulateResiduals(fittedModel = poll.limit.mod24.up, plot = F)
+plot(simoutpolllim24)
+
+# print dispersion and zero-inflation test results (don't plot for space)
+testDispersion(simoutpolllim24, plot = F)
+testZeroInflation(simoutpolllim24, plot = F)
+
+# cleanup
+rm(simoutpolllim, simoutpolllim24, poll.limit.mod.up, 
+    poll.limit.mod24.up, aov.poll.limit.mod.up, aov.poll.limit.mod24.up)
+
+```
+
+these do not look great (as with the models that included Lile and Mefu)---stick with the model with 2- and 3-way interactions.
 
 ### plots pollen limitation
 

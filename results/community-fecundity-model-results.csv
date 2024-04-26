@@ -1,4 +1,4 @@
 "","term","statistic","df","p.value"
-"1","phenshift.binary",36.7686651765551,1,1.33011023387408e-09
-"2","phenshift.binary:species",1021.58366649072,14,3.65744693089382e-209
-"3","phenshift.binary:species:num.flowers",75.000679064185,16,1.30716883089363e-09
+"1","phenshift.binary",36.7686651769949,1,1.33011023357407e-09
+"2","phenshift.binary:species",1021.5836664885,14,3.65744693492278e-209
+"3","phenshift.binary:species:num.flowers",75.0006790644441,16,1.30716883075493e-09

@@ -1215,13 +1215,24 @@ pollimplot.up
 
 #### Effect sizes of pollen limitation
 
-challenging because it is an interaction... plan:
+Need to be thoughtful about reporting effect sizes, because the effect stems from an interaction.
 
-* data are *close* to perfect for this---ideally the hand-pollination line would be perfectly flat (it's about as close as it could be realistically)
-* really the effect size is the difference between the open pollination treatments
-* calculate the mean whole-plant fecundity difference (with all data) for just the three species included in this graph as a baseline to assess the proportional difference driven by pollen limitation
+**Ultimately, the fecundity differences between control and phenology-accelerated plants---both aggregated and at the species level---are consistent with being driven _completely_ by pollen limitation and not by resource limitation.**
 
-```{r pollen limitation effect overall size}
+Here is more on that rationale, in the context of interpreting pollen limitation data:
+
+* FIRST: resource limitation. One can examine the hand-pollinted data (slope of the line from control to manip) to see if there are differences in resource limitation, because these data are experimentally designed to show the case where there is *no* pollen limitation
+    + if the hand-pollination line is flat (no difference between control and manip), then resource limitation is not at play
+    + if by contrast the hand-pollinated treatment has higher fecundity in control, that would mean that there is a negative impact of the phenology acceleration on resource limitation (i.e. more resource limitation in accelerated plots)
+    + similarly, if hand-pollinated fecundity is higher in the phenology acceleration treatment, then there is a positive impact of the phenology acceleration on resource limitation (i.e. less resource limitation in accelerated plots)
+* SECOND: pollen limitation. If there is no difference between the hand-pollination fecundity and the open-pollination fecundity in either experimental treatment, that means that there is no pollen limitation.
+    + if there is a difference between open and hand pollinated plants in any treatment, that means that there is some pollen limitation occurring
+    + if there is no difference between open and hand in the control, that means that plants were not pollen limited in the control; but if that result is combined with a difference between open and hand in the phenology-accelerated treatment (as we found both overall and for *D. nuttalianum*), AND there is no resource limitation (flat line between hand-pollinated treatments in control and phenology manip) then we can say that the negative effects of the phenology manipulation are completely due to differences in pollen limitation
+* if there were a difference between open and hand in both control and phenology manip, but the effect were bigger in phenology manip, then we could calculate the proportional difference between the two to get at the effect size of pollen limitation (how much *more* pollen limitation there was in treatment vs. control)---but again we do not have that situation here.
+
+The code chunk below set to `"eval = F"` because following the above rationale, pollen limitation is responsible for all of the difference between control and phenology manip in all of the cases we found (both combined and species-by-species), including the positive effects of the phenology manipulations on *Lathyrus lanzwertii*.
+
+```{r pollen limitation effect overall size, eval = F}
 
 # code from the community-wide fecundity component above; altering to include only the three species of interest (Lathyrus, D. nutt., and Potentilla pulch)---implement this by excluding Lile and Mefu
 
@@ -1247,13 +1258,17 @@ fecund.diff = round(phenfecsum.effectsize$mean.seeds[1] - phenfecsum.effectsize$
 prop.fecund.diff = round(fecund.diff/phenfecsum.effectsize$mean.seeds[1],3)
 
 # POLLEN LIMITATION DATASEST
+pollim.effect.prop = 1 - pollimsum.up$mean.seeds[3]/pollimsum.up$mean.seeds[1]
 
 ```
 
-For the three target species, not limiting our data to the pollen limitation subset, the effect size of the phenology acceleration manipulation is `R fecund.diff` fewer seeds in the manipulated plots relative to controls. This is a proportional difference of `R prop.fecund.diff`, which is very similar to the effect size of `R round(fecund.effect.size,3)`.
+<!-- **TEXT COMMENTED OUT FOR NOW, PROBABLY DELETE** -->
 
-Because we are using a different subset of data for the pollen limitation analyses, it is probably better to compare proportional effects rather than raw effects.
+<!-- For the three target species, not limiting our data to the pollen limitation subset, the effect size of the phenology acceleration manipulation is `R fecund.diff` fewer seeds in the manipulated plots relative to controls. This is a proportional difference of `R prop.fecund.diff`, which is very similar to the effect size of `R round(fecund.effect.size,3)`. -->
 
+<!-- Because we are using a different subset of data for the pollen limitation analyses, it is probably better to compare proportional effects rather than raw effects. -->
+
+<!-- `R round(pollim.effect.prop,3)`. -->
 
 
 

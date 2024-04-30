@@ -1025,6 +1025,81 @@ write.csv(aov.poll.limit.mod24.up, file = "results/community-pollen-limitation-m
 
 ```
 
+#### resource limitation models
+
+To test if there are differences in resource limitation between the control plots and the phenology-accelerated (manipulated) plots, we can compare the hand-pollinated (only) plants between the two groups. If there is no significant difference between the two, we do not have any evidence of resource limitation driven by our treatment (to be clear, that is *not* the same as saying that there is significant homogeneity between the two). 
+By contrast, if we find a significant difference, then the treatment has driven changes in resource limitation. These could reduce resource limitation (i.e. benefit reproduction) theoretically in either the control or the phenology-accelerated plots.
+
+Following the convention set above of not including species as a main effect but instead assessing the interaction between phenology acceleration treatment and species. This is conservative here as it maximizes power to find differences in the main effect of phenology acceleration. 
+
+First we assess a model for all three of the hand-pollinated plant species pooled:
+
+```{r resource limitation model pooled}
+
+# limit to hand-pollinated data only
+pollimdat.rl = pollimdat.up %>% filter(plant.treat == "open-hand")
+
+# model
+resource.limit.mod = glmmTMB(totalseeds ~ phenshift.binary/species + 
+                  (1|site/site.plot), family = nbinom2, ziformula = ~1,
+                  data = pollimdat.rl, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
+
+# display results
+Anova(resource.limit.mod)
+
+```
+the lack of significance in the main effect (`phenshift.binary`) is consistent with no impact of our phenology acceleration manipulation on resource limitation.
+
+Next, we assess each species separately:
+
+```{r resource limitation model species specific}
+
+# Denu (Delphinium nuttalianum)
+pollimdat.Denu = pollimdat.rl %>% filter(species == "Denu")
+
+# model
+resource.limit.Denu = glmmTMB(totalseeds ~ phenshift.binary + 
+                  (1|site/site.plot), family = nbinom2, ziformula = ~1,
+                  data = pollimdat.Denu, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
+
+# display results
+cat("Delphinium nuttalianum resource limitation")
+Anova(resource.limit.Denu)
+
+# =============
+# Lale (Lathyrus lanzwertii)
+pollimdat.Lala = pollimdat.rl %>% filter(species == "Lala")
+
+# model
+# initial attempt with zero-inflation failed to converge
+# model without ZI:
+resource.limit.Lala = glmmTMB(totalseeds ~ phenshift.binary + 
+                  (1|site/site.plot), family = nbinom2, data = pollimdat.Lala)
+
+## failed model with ZI:
+# resource.limit.Lala = glmmTMB(totalseeds ~ phenshift.binary + 
+#                   (1|site/site.plot), family = nbinom2, ziformula = ~1,
+#                   data = pollimdat.Lala, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
+
+# display results
+cat("Lathyrus lanzwertii resource limitation")
+Anova(resource.limit.Lala)
+
+#===============
+# Popu (Potentilla pulcherrema)
+pollimdat.Popu = pollimdat.rl %>% filter(species == "Popu")
+
+# model
+resource.limit.Popu = glmmTMB(totalseeds ~ phenshift.binary + 
+                  (1|site/site.plot), family = nbinom2, ziformula = ~1,
+                  data = pollimdat.Popu, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
+
+# display results
+cat("Potentilla pulcherrema resource limitation")
+Anova(resource.limit.Popu)
+
+```
+
 #### model assessment pollen limitation
 
 Assess model residuals to see if the model meets basic statistical assumptions, using the `DHARMa` package. Also asssess dispersion (over- and under-dispersion) and zero-inflation. Trying this out for both models, those with 3-way and with 4-way interactions.
@@ -1065,6 +1140,71 @@ rm(simoutpolllim, simoutpolllim24, poll.limit.mod,
 ```
 
 looks problematic in terms of residuals vs. predicted values; stick to reporting the simpler model with 2- and 3-way interactions.
+
+#### model assessment resource limitation
+
+
+```{r model assessment resource limitation}
+# "simoutpollim24" = simulation output, pollen limitation models 
+# (with 2- and 4-way interactions)
+simout.rl <- simulateResiduals(fittedModel = resource.limit.mod, plot = F)
+plot(simout.rl)
+
+# print dispersion and zero-inflation test results (don't plot for space)
+testDispersion(simout.rl, plot = F)
+testZeroInflation(simout.rl, plot = F)
+
+# cleanup
+# rm(simout.rl, resource.limit.mod)
+
+```
+
+resource limitation model (pooled across species) looks fine
+
+Now assess each of the species-specific models (note, Lale does not include zero-inflation because model did not converge)
+
+resource.limit.Popu
+
+```{r model assessment resource limitation species specific}
+
+# Denu
+cat("Delphinium nuttalianum resource limitation")
+simout.Denu <- simulateResiduals(fittedModel = resource.limit.Denu, plot = F)
+plot(simout.Denu)
+
+# print dispersion and zero-inflation test results (don't plot for space)
+testDispersion(simout.Denu, plot = F)
+testZeroInflation(simout.Denu, plot = F)
+
+#============================
+# Lala
+cat("Lathyrus lanzwertii resource limitation")
+simout.Lala <- simulateResiduals(fittedModel = resource.limit.Lala, plot = F)
+plot(simout.Lala)
+
+# print dispersion and zero-inflation test results (don't plot for space)
+testDispersion(simout.Lala, plot = F)
+testZeroInflation(simout.Lala, plot = F)
+
+#============================
+# Popu
+cat("Potentilla pulcherrema resource limitation")
+simout.Popu <- simulateResiduals(fittedModel = resource.limit.Popu, plot = F)
+plot(simout.Popu)
+
+# print dispersion and zero-inflation test results (don't plot for space)
+testDispersion(simout.Popu, plot = F)
+testZeroInflation(simout.Popu, plot = F)
+
+#============================
+
+# cleanup
+# rm(simout.rl, resource.limit.Denu, resource.limit.Lala, resource.limit.Popu)
+
+
+```
+
+all three look good; in particular no issue with lack of zero-inflation in Popu.
 
 #### model assessment pollen limitation UPDATED
 

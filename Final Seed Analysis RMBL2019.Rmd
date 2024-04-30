@@ -767,7 +767,11 @@ sppfecplotci
 # ggsave(sppfecplotci, file = "plots/fecundity-by-species-phenology.jpg",
 #    width = 5, height = 3)
 
-# don't cleanup just yet, need to combine plots first
+# cleanup from previous code chunk:
+rm(fecund.effect.size)
+
+# don't cleanup just yet from this chunk, need to combine plots first
+
 
 ```
 
@@ -920,7 +924,7 @@ pollimdat$num.flowers = as.integer(pollimdat$num.flowers)
     
 Finally, following initial model assessment with `DHARMa` we included a zero-inflation term since models without it show under-dispersion and marginally significant zero-inflation. By including zero-inflation in the model, the dispersion issues are resolved. See the next section ("model assessment") for more info.
 
-```{r models of community-wide pollen limitation}
+```{r models of community-wide pollen limitation, warning = F, message = F}
 
 # these models were tricky to specify syntactically... remember:
 # - "*" specifies an interaction and both associated main effects
@@ -978,7 +982,7 @@ in a nutshell:
 
 After plotting these models (below), it is clear that the hand-pollination treatments did not work for `Mefu` or for `Lile`; instead, the hand-pollinated plants always produced fewer seeds than the open-pollinated plants in both treatment and control plots. Since it was our experimental manipulation of these plants that failed, it seems clear that we should remove those species from this analysis as they could obfuscate results. This will leave us unfortunately with only 3 species, but it still seems worth assessing those combined.
 
-```{r models of community-wide pollen limitation updated}
+```{r models of community-wide pollen limitation updated, warning = F, messages = F}
 
 # these models were tricky to specify syntactically... remember:
 # - "*" specifies an interaction and both associated main effects
@@ -1030,7 +1034,7 @@ write.csv(aov.poll.limit.mod24.up, file = "results/community-pollen-limitation-m
 To test if there are differences in resource limitation between the control plots and the phenology-accelerated (manipulated) plots, we can compare the hand-pollinated (only) plants between the two groups. If there is no significant difference between the two, we do not have any evidence of resource limitation driven by our treatment (to be clear, that is *not* the same as saying that there is significant homogeneity between the two). 
 By contrast, if we find a significant difference, then the treatment has driven changes in resource limitation. These could reduce resource limitation (i.e. benefit reproduction) theoretically in either the control or the phenology-accelerated plots.
 
-Following the convention set above of not including species as a main effect but instead assessing the interaction between phenology acceleration treatment and species. This is conservative here as it maximizes power to find differences in the main effect of phenology acceleration. 
+Because we are zeroing in to see if there are differences among the hand-pollinated plants in control and manip, and we want to maximize our power to potentially find differences, we will use species as a random intercept (different plant species have different mean / maximum seed counts). Moreover, we expect that because all of these plants are hand-pollinated, that we will have fewer plants with zero whole-plant seed production, thus trying without a zero-inflation term at least to start. Will add one in if model assessment deems it necessary.
 
 First we assess a model for all three of the hand-pollinated plant species pooled:
 
@@ -1040,9 +1044,9 @@ First we assess a model for all three of the hand-pollinated plant species poole
 pollimdat.rl = pollimdat.up %>% filter(plant.treat == "open-hand")
 
 # model
-resource.limit.mod = glmmTMB(totalseeds ~ phenshift.binary/species + 
-                  (1|site/site.plot), family = nbinom2, ziformula = ~1,
-                  data = pollimdat.rl, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
+resource.limit.mod = glmmTMB(totalseeds ~ phenshift.binary +
+                  (1|site/site.plot) + (1|species), family = nbinom2,
+                  data = pollimdat.rl)
 
 # display results
 Anova(resource.limit.mod)
@@ -1050,7 +1054,7 @@ Anova(resource.limit.mod)
 ```
 the lack of significance in the main effect (`phenshift.binary`) is consistent with no impact of our phenology acceleration manipulation on resource limitation.
 
-Next, we assess each species separately:
+Next, we assess each species separately; same as above but taking out the species-level random intercept:
 
 ```{r resource limitation model species specific}
 
@@ -1059,11 +1063,11 @@ pollimdat.Denu = pollimdat.rl %>% filter(species == "Denu")
 
 # model
 resource.limit.Denu = glmmTMB(totalseeds ~ phenshift.binary + 
-                  (1|site/site.plot), family = nbinom2, ziformula = ~1,
-                  data = pollimdat.Denu, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
+                  (1|site/site.plot), family = nbinom2, data = pollimdat.Denu)
 
 # display results
-cat("Delphinium nuttalianum resource limitation")
+cat("\n", "=================================================", "\n", sep = "")
+cat("## Delphinium nuttalianum resource limitation ##", "\n", sep = "")
 Anova(resource.limit.Denu)
 
 # =============
@@ -1076,13 +1080,9 @@ pollimdat.Lala = pollimdat.rl %>% filter(species == "Lala")
 resource.limit.Lala = glmmTMB(totalseeds ~ phenshift.binary + 
                   (1|site/site.plot), family = nbinom2, data = pollimdat.Lala)
 
-## failed model with ZI:
-# resource.limit.Lala = glmmTMB(totalseeds ~ phenshift.binary + 
-#                   (1|site/site.plot), family = nbinom2, ziformula = ~1,
-#                   data = pollimdat.Lala, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
-
 # display results
-cat("Lathyrus lanzwertii resource limitation")
+cat("\n", "=================================================", "\n", sep = "")
+cat("## Lathyrus lanzwertii resource limitation ##", "\n", sep = "")
 Anova(resource.limit.Lala)
 
 #===============
@@ -1091,14 +1091,16 @@ pollimdat.Popu = pollimdat.rl %>% filter(species == "Popu")
 
 # model
 resource.limit.Popu = glmmTMB(totalseeds ~ phenshift.binary + 
-                  (1|site/site.plot), family = nbinom2, ziformula = ~1,
-                  data = pollimdat.Popu, control=glmmTMBControl(optimizer=optim, optArgs=list(method="BFGS")))
+                  (1|site/site.plot), family = nbinom2, data = pollimdat.Popu)
 
 # display results
-cat("Potentilla pulcherrema resource limitation")
+cat("\n", "=================================================", "\n", sep = "")
+cat("## Potentilla pulcherrema resource limitation ##", "\n", sep = "")
 Anova(resource.limit.Popu)
 
 ```
+
+No evidence of resource limitation driven by the phenology acceleration manipulation in any of the species.
 
 #### model assessment pollen limitation
 
@@ -1133,20 +1135,20 @@ plot(simoutpolllim24)
 testDispersion(simoutpolllim24, plot = F)
 testZeroInflation(simoutpolllim24, plot = F)
 
-# cleanup
-rm(simoutpolllim, simoutpolllim24, poll.limit.mod, 
-    poll.limit.mod24, aov.poll.limit.mod, aov.poll.limit.mod24)
+## cleanup
+rm(simoutpolllim, simoutpolllim24, poll.limit.mod, poll.limit.mod24, 
+   aov.poll.limit.mod, aov.poll.limit.mod24)
 
 ```
 
-looks problematic in terms of residuals vs. predicted values; stick to reporting the simpler model with 2- and 3-way interactions.
+looks problematic in terms of residuals vs. predicted values; stick to reporting the simpler model with 2- and 3-way interactions (rather than this model that includes 4-way interactions)
 
 #### model assessment resource limitation
 
 
 ```{r model assessment resource limitation}
-# "simoutpollim24" = simulation output, pollen limitation models 
-# (with 2- and 4-way interactions)
+
+# pooled resource limitaiton model
 simout.rl <- simulateResiduals(fittedModel = resource.limit.mod, plot = F)
 plot(simout.rl)
 
@@ -1155,12 +1157,13 @@ testDispersion(simout.rl, plot = F)
 testZeroInflation(simout.rl, plot = F)
 
 # cleanup
-# rm(simout.rl, resource.limit.mod)
+rm(resource.limit.mod, simout.rl)
 
 ```
 
 resource limitation model (pooled across species) looks fine
 
+**species-specific models**
 Now assess each of the species-specific models (note, Lale does not include zero-inflation because model did not converge)
 
 resource.limit.Popu
@@ -1168,6 +1171,7 @@ resource.limit.Popu
 ```{r model assessment resource limitation species specific}
 
 # Denu
+cat("=================================================", "\n", sep = "")
 cat("Delphinium nuttalianum resource limitation")
 simout.Denu <- simulateResiduals(fittedModel = resource.limit.Denu, plot = F)
 plot(simout.Denu)
@@ -1178,6 +1182,7 @@ testZeroInflation(simout.Denu, plot = F)
 
 #============================
 # Lala
+cat("=================================================", "\n", sep = "")
 cat("Lathyrus lanzwertii resource limitation")
 simout.Lala <- simulateResiduals(fittedModel = resource.limit.Lala, plot = F)
 plot(simout.Lala)
@@ -1188,6 +1193,7 @@ testZeroInflation(simout.Lala, plot = F)
 
 #============================
 # Popu
+cat("=================================================", "\n", sep = "")
 cat("Potentilla pulcherrema resource limitation")
 simout.Popu <- simulateResiduals(fittedModel = resource.limit.Popu, plot = F)
 plot(simout.Popu)
@@ -1199,12 +1205,12 @@ testZeroInflation(simout.Popu, plot = F)
 #============================
 
 # cleanup
-# rm(simout.rl, resource.limit.Denu, resource.limit.Lala, resource.limit.Popu)
-
+rm(resource.limit.Denu, resource.limit.Lala, resource.limit.Popu, simout.Popu,
+   simout.Denu, simout.Lala, pollimdat.Denu, pollimdat.Lala, pollimdat.Popu)
 
 ```
 
-all three look good; in particular no issue with lack of zero-inflation in Popu.
+all three look good.
 
 #### model assessment pollen limitation UPDATED
 
@@ -1225,6 +1231,7 @@ plot(simoutpolllim)
 # print dispersion and zero-inflation test results (don't plot for space)
 testDispersion(simoutpolllim, plot = F)
 testZeroInflation(simoutpolllim, plot = F)
+
 ```
 while plots aren't the cleanest, no obvious issues and dispersion test and overdispersion tests not significant---feel comfortable reporting on these models.
 
@@ -1232,7 +1239,7 @@ while plots aren't the cleanest, no obvious issues and dispersion test and overd
 
 again, without "Lile" and "Mefu"
 
-```{r model assessment pollen limitation 24}
+```{r model assessment pollen limitation 24 updated}
 # "simoutpollim24" = simulation output, pollen limitation models 
 # (with 2- and 4-way interactions)
 simoutpolllim24 <- simulateResiduals(fittedModel = poll.limit.mod24.up, plot = F)

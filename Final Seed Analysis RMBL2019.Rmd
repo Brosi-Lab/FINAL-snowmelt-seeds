@@ -37,9 +37,9 @@ rm(list = ls())
 
 # create a list of needed packages:
 # (ADD / delete the packages you need / don't below!)
-Packages <- c("tidyverse", "knitr", "kableExtra", "glmmTMB", "fitdistrplus", 
+Packages <- c("knitr", "kableExtra", "glmmTMB", "fitdistrplus", "evaluate",
               "reshape2", "vegan", "car", "ggpubr", "broom.mixed", "mclogit", 
-              "DHARMa", "gridExtra", "renv") 
+              "DHARMa", "gridExtra", "renv", "hillR", "tidyverse") 
 
 # this line loads all of the packages:
 lapply(Packages, library, character.only = TRUE)
@@ -49,6 +49,12 @@ options(dplyr.summarise.inform = FALSE)
 
 # format package list for printing below:
 Packages <- paste(Packages, sep = ", ")
+
+# SAVE PACKAGE WARNING MESSAGES
+# this saves messages associated with package loading; display at the end
+# `evaluate` package
+package.loading.messages = evaluate(lapply(Packages, library, character.only = TRUE))
+
 
 # ==========================
 # RENV info
@@ -75,7 +81,7 @@ Packages <- paste(Packages, sep = ", ")
 
 ## Data import
 
-three datasets to import:
+four datasets to import:
 
 * seed data
     + most of the relevant data are included in here; 1155 rows in the original dataset
@@ -85,6 +91,8 @@ three datasets to import:
     + one data point per plot-species combination; 116 rows
     + data on how many weeks the flowering phenology in the snowmelt-accelerated plot was advanced relative to the control
     + all control plots have a zero (acceleration is relative to this)
+* pollinator data
+
 
 ```{r data import}
 
@@ -94,6 +102,8 @@ masterdat = read.csv("data/Masterseed2019.csv", stringsAsFactors = F, header=T)
 snowmeltdat = read.csv("data/regressionmeltdays.csv", header = T)
 # species-plot level phenological shift
 phenoshift = read.csv("data/phenoshifted.csv", stringsAsFactors = F, header=T)
+# flower visitation data raw
+visitdat = read.csv("data/snowmelt_network.csv")
 
 # clean up `Packages` list (doing it here because had to print above):
 rm(Packages)
@@ -205,6 +215,29 @@ masterdat$plotID = paste(masterdat$site.abbrev, masterdat$plot.orient, sep=".")
 
 # ID for individual plants
 masterdat$plantID = paste(masterdat$site, masterdat$plot.treat, masterdat$species, masterdat$quad, masterdat$grid, masterdat$plant.treat, sep = ".")
+
+#=================
+# visitdat
+
+# fix date column name and make it a date object
+names(visitdat)[1] <- "date"
+visitdat$date <- as.Date(visitdat$date, format = "%m/%d/%y")
+visitdat$year <- year(visitdat$date)
+# filter to only include 2019
+visitdat <- visitdat %>% filter(year == 2019)
+
+# fix site names
+visitdat$site = str_replace(visitdat$site, "pfeiler", "Pfeiler")
+visitdat$site = str_replace(visitdat$site, "Wash 3C", "WG3C")
+visitdat$site <- str_replace_all(visitdat$site," ","")
+
+# remove Kaysee's data
+visitdat <- visitdat %>% filter(plot != "Kaysee")
+
+# sampling of Rustler's Gulch: some samples mislabeled as 8/24
+# should be 8/23
+datelist = which(visitdat$date=="2019-08-24")
+visitdat$date[datelist] = "2019-08-23"
 
 ```
 
@@ -467,6 +500,99 @@ rm(plotsnow, meanplotbysite, meansbysite, meltphenplot)
 
 ```
 
+## Pollinator Community
+
+The objective here is just to assess if there are differences in the pollinator communities between snowmelt accelerated and control plots. Our hypothesis is that there will be no difference, because pollinators range over much larger areas than the size of the snowmelt plots.
+
+### data prep pollinator comm data prep
+
+* remove `BellviewBench` and `403Bench` sites (see "Community Fecundity" section)
+* for clarity, strip down the columns to only those needed
+* summarize dataframe at the site by week level to include visit number (abundance) and species richness
+    + we can make direct comparisons of species richness because of perfectly balanced sampling
+
+
+```{r data prep pollinator comm analyses}
+
+# remove unused sites
+site.list = c("BellviewBench", "403Bench")
+visitdat = visitdat %>% filter(!(site %in% site.list))
+# remove unused columns
+visitdat = visitdat %>% dplyr::select(date, site, plot, specimen_number, gross_ID)
+
+# remove blank visitor rows
+visitdat = visitdat %>% filter(gross_ID != "")
+
+# summarize by site-week
+visitdat.summ = visitdat %>% group_by(site, plot, date) %>% summarize(richness = n_distinct(gross_ID), abundance = n())
+
+# check to see if control and manip at each site were sampled on the same day
+visit.check = visitdat.summ %>% group_by(date, site, plot) %>% summarize(n = n())
+visit.check = pivot_wider(visit.check, names_from = plot, values_from = n)
+
+# some site-plot-date combos have `NA`s: address
+# no samples before 6-19 have both control and manip sampled
+visitdat.summ = visitdat.summ %>% filter(date > "2019-06-18")
+# Rustler's Gulch: 6/26 sample does not have data for Control; remove
+visitdat.summ = visitdat.summ %>% filter(!date == "2019-06-26")
+
+# repeat check to be sure:
+visit.check = visitdat.summ %>% group_by(date, site, plot) %>% summarize(n = n())
+visit.check = pivot_wider(visit.check, names_from = plot, values_from = n)
+# looks good
+
+# clean up
+rm(site.list, visit.check)
+
+```
+
+### analyses pollinator comm
+
+mixed effects models of:
+
+* species richness
+* abundance
+
+with `site` and `date` as crossed random intercepts. For both response variables, tried first with negative binomial errors; got a convergence problem with richness so reverted to Poisson (conducted model assessment below, no issues).
+
+```{r data prep pollinator comm analyses}
+
+cat("ABUNDANCE", "\n", sep = "")
+poll.abund.mod = glmmTMB(abundance ~ plot + (1|date) + (1|site), family = nbinom2(), data = visitdat.summ)
+poll.abund.mod.aov = Anova(poll.abund.mod)
+poll.abund.mod.aov
+
+cat("\n", "\n", "SPECIES RICHNESS", "\n", sep = "")
+poll.rich.mod = glmmTMB(richness ~ plot + (1|date) + (1|site), family = poisson, data = visitdat.summ)
+poll.rich.mod.aov = Anova(poll.rich.mod)
+poll.rich.mod.aov
+
+```
+As hypothesized, we do not see significant effects of our phenology acceleration manipulation on pollinator species richness or abundance, when assessed within site-week combinations. 
+
+### model assessment pollinator comm
+
+```{r model assessment pollinator comm}
+
+# ABUNDANCE
+cat("ABUNDANCE", "\n", sep = "")
+# simulate residuals using DHARMa
+simoutpollabund <- simulateResiduals(fittedModel = poll.abund.mod, plot = F)
+plot(simoutpollabund)
+testDispersion(simoutpollabund, plot = F)
+
+# RICHNESS
+cat("RICHNESS", "\n", sep = "")
+# simulate residuals using DHARMa
+simoutpollrich <- simulateResiduals(fittedModel = poll.rich.mod, plot = F)
+plot(simoutpollrich)
+testDispersion(simoutpollrich, plot = F)
+
+# cleanup
+rm(simoutpollabund)
+```
+
+model assessments looks very clean for both.
 
 ## Community Fecundity
 
@@ -1615,5 +1741,6 @@ for reproducibility
 
 ```{r sessionInfo}
 sessionInfo()
+package.loading.messages
 ```
 

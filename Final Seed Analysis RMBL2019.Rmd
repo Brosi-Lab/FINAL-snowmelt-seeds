@@ -39,7 +39,7 @@ rm(list = ls())
 # (ADD / delete the packages you need / don't below!)
 Packages <- c("knitr", "kableExtra", "glmmTMB", "fitdistrplus", "evaluate",
               "reshape2", "vegan", "car", "ggpubr", "broom.mixed", "mclogit", 
-              "DHARMa", "gridExtra", "renv", "hillR", "tidyverse") 
+              "DHARMa", "gridExtra", "renv", "hillR", "tidyverse")
 
 # this line loads all of the packages:
 lapply(Packages, library, character.only = TRUE)
@@ -238,6 +238,13 @@ visitdat <- visitdat %>% filter(plot != "Kaysee")
 # should be 8/23
 datelist = which(visitdat$date=="2019-08-24")
 visitdat$date[datelist] = "2019-08-23"
+
+# no samples before 6-19 have both control and manip sampled
+visitdat = visitdat %>% filter(date > "2019-06-18")
+
+# Rustler's Gulch: 6/26 sample does not have data for Control; remove
+visitdat = visitdat %>% filter(!date == "2019-06-26")
+
 
 ```
 
@@ -526,19 +533,10 @@ visitdat = visitdat %>% filter(gross_ID != "")
 # summarize by site-week
 visitdat.summ = visitdat %>% group_by(site, plot, date) %>% summarize(richness = n_distinct(gross_ID), abundance = n())
 
-# check to see if control and manip at each site were sampled on the same day
+# check to see if control and manip at each site were each sampled on the same day
 visit.check = visitdat.summ %>% group_by(date, site, plot) %>% summarize(n = n())
 visit.check = pivot_wider(visit.check, names_from = plot, values_from = n)
 
-# some site-plot-date combos have `NA`s: address
-# no samples before 6-19 have both control and manip sampled
-visitdat.summ = visitdat.summ %>% filter(date > "2019-06-18")
-# Rustler's Gulch: 6/26 sample does not have data for Control; remove
-visitdat.summ = visitdat.summ %>% filter(!date == "2019-06-26")
-
-# repeat check to be sure:
-visit.check = visitdat.summ %>% group_by(date, site, plot) %>% summarize(n = n())
-visit.check = pivot_wider(visit.check, names_from = plot, values_from = n)
 # looks good
 
 # clean up
@@ -592,7 +590,17 @@ testDispersion(simoutpollrich, plot = F)
 rm(simoutpollabund)
 ```
 
-model assessments looks very clean for both.
+model assessments looks very clean for both models.
+
+### community similarity pollinators
+
+use the `adonis2` function in the `vegan` package to assess differences in Morisita-Horn similarity. Do this using sample dates nested within sites as `strata` within which permutations are generated. It looks like we should (??) be able to do this by specifying the `strata` via the [`Permute` package](https://cran.r-project.org/web/packages/permute/vignettes/permutations.html):
+
+> The highest level of the hierarchy is the *block* level. Blocks restrict permutation of samples to within the levels of this factor; samples are never swapped between blocks.
+
+>The *plot* level sits below blocks. Plots... group samples in the same way as blocks. As such, some permutation designs can be initiated using a factor at the plot level or the same factor at the block level. 
+
+... but need to figure out how to specify this design
 
 ## Community Fecundity
 

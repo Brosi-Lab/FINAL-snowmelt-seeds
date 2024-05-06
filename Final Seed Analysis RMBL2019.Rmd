@@ -698,12 +698,14 @@ site.species.mat <- dat.weighted %>%
 # 2. calculate Morisita-Horn similarity
 morisita.poll = vegdist(site.species.mat[,-1:-3], method = "morisita")
 
-# # 3. run `adonis2`
-# # start by specifying permutations
+# 3. run `adonis2`
+# start by specifying permutations:
 perm <- with(site.species.mat[,1:3], how(nperm = 999, blocks = site))
 
+# adonis2:
 poll.comm.sim = adonis2(morisita.poll ~ plot, data = site.species.mat, permutations = perm, na.rm = TRUE, method = "morisita")
 print(poll.comm.sim)
+# confirmed from output that "Blocks: site" (which is what we want)
 
 # clean
 rm(dat.weighted, poll.comm.sim, morisita.poll, site.species.mat)

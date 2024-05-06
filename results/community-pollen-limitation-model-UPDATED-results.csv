@@ -1,3 +1,3 @@
 "","term","statistic","df","p.value"
-"1","plant.treat:phenshift.binary",11.9636889056071,3,0.00750858769922126
-"2","plant.treat:phenshift.binary:species",753.85578822241,8,1.80459704634197e-157
+"1","plant.treat:phenshift.binary",11.9636889059921,3,0.0075085876978801
+"2","plant.treat:phenshift.binary:species",753.855788220332,8,1.80459704820234e-157

@@ -544,7 +544,7 @@ rm(site.list, visit.check)
 
 ```
 
-### analyses pollinator comm
+### analyses pollinator richness abundance
 
 mixed effects models of:
 
@@ -553,20 +553,33 @@ mixed effects models of:
 
 with `site` and `date` as crossed random intercepts. For both response variables, tried first with negative binomial errors; got a convergence problem with richness so reverted to Poisson (conducted model assessment below, no issues).
 
-```{r data prep pollinator comm analyses}
+```{r pollinator richness abundance analyses}
 
 cat("ABUNDANCE", "\n", sep = "")
-poll.abund.mod = glmmTMB(abundance ~ plot + (1|date) + (1|site), family = nbinom2(), data = visitdat.summ)
+cat("by site by week:", "\n", sep = "")
+poll.abund.wk.mod = glmmTMB(abundance ~ plot + (1|date) + (1|site), family = nbinom2(), data = visitdat.summ)
+poll.abund.wk.mod.aov = Anova(poll.abund.wk.mod)
+poll.abund.wk.mod.aov
+
+cat("\n", "by site only:", "\n", sep = "")
+poll.abund.mod = glmmTMB(abundance ~ plot + (1|site), family = nbinom2(), data = visitdat.summ)
 poll.abund.mod.aov = Anova(poll.abund.mod)
 poll.abund.mod.aov
 
 cat("\n", "\n", "SPECIES RICHNESS", "\n", sep = "")
-poll.rich.mod = glmmTMB(richness ~ plot + (1|date) + (1|site), family = poisson, data = visitdat.summ)
+cat("by site by week:", "\n", sep = "")
+poll.rich.wk.mod = glmmTMB(richness ~ plot + (1|date) + (1|site), family = poisson, data = visitdat.summ)
+poll.rich.wk.mod.aov = Anova(poll.rich.wk.mod)
+poll.rich.wk.mod.aov
+
+cat("\n", "by site only:", "\n", sep = "")
+poll.rich.mod = glmmTMB(richness ~ plot + (1|site), family = poisson, data = visitdat.summ)
 poll.rich.mod.aov = Anova(poll.rich.mod)
 poll.rich.mod.aov
 
+
 ```
-As hypothesized, we do not see significant effects of our phenology acceleration manipulation on pollinator species richness or abundance, when assessed within site-week combinations. 
+As hypothesized, we do not see significant effects of our phenology acceleration manipulation on pollinator species richness or abundance, when assessed either within site-week combinations, or by site alone. Surprisingly for species richness, the *p*-values are the same for both site-week and site, but I double-checked the code, and this is just coincidence.
 
 ### model assessment pollinator comm
 
@@ -574,33 +587,126 @@ As hypothesized, we do not see significant effects of our phenology acceleration
 
 # ABUNDANCE
 cat("ABUNDANCE", "\n", sep = "")
+cat("by site by week:", "\n", sep = "")
+# simulate residuals using DHARMa
+simoutpollabund.wk <- simulateResiduals(fittedModel = poll.abund.wk.mod, plot = F)
+plot(simoutpollabund.wk)
+testDispersion(simoutpollabund.wk, plot = F)
+
+cat("\n", "by site only:", "\n", sep = "")
 # simulate residuals using DHARMa
 simoutpollabund <- simulateResiduals(fittedModel = poll.abund.mod, plot = F)
 plot(simoutpollabund)
 testDispersion(simoutpollabund, plot = F)
 
+
 # RICHNESS
 cat("RICHNESS", "\n", sep = "")
+cat("by site by week:", "\n", sep = "")
+# simulate residuals using DHARMa
+simoutpollrich.wk <- simulateResiduals(fittedModel = poll.rich.wk.mod, plot = F)
+plot(simoutpollrich.wk)
+testDispersion(simoutpollrich.wk, plot = F)
+
+cat("\n", "by site only:", "\n", sep = "")
 # simulate residuals using DHARMa
 simoutpollrich <- simulateResiduals(fittedModel = poll.rich.mod, plot = F)
 plot(simoutpollrich)
 testDispersion(simoutpollrich, plot = F)
 
+
 # cleanup
 rm(simoutpollabund)
 ```
 
-model assessments looks very clean for both models.
+model assessments looks very clean for all four models.
 
 ### community similarity pollinators
 
-use the `adonis2` function in the `vegan` package to assess differences in Morisita-Horn similarity. Do this using sample dates nested within sites as `strata` within which permutations are generated. It looks like we should (??) be able to do this by specifying the `strata` via the [`Permute` package](https://cran.r-project.org/web/packages/permute/vignettes/permutations.html):
+steps are:
 
-> The highest level of the hierarchy is the *block* level. Blocks restrict permutation of samples to within the levels of this factor; samples are never swapped between blocks.
+1. create site-by-species matrix from visitation data
+1. calculate site-by-site dissimilarity matrix with Morisita-Horn similarity (in this case, using M-H not because of unbalanced sampling, but instead because of its robustness to incomplete sampling)
+1. use `adonis2` to run a permutational MANOVA to statistically assess differences between snowmelt and control
 
->The *plot* level sits below blocks. Plots... group samples in the same way as blocks. As such, some permutation designs can be initiated using a factor at the plot level or the same factor at the block level. 
+Before we do this, want to combine some of the `gross_ID` categories:
 
-... but need to figure out how to specify this design
+* all *Bombus* into one category
+* small & large *Megachile*
+* all non-*Megachile* solitary bees (big and small)
+* white and blue butterflies
+* "unknown" = "Unknown"
+
+In addition, we will want to remove any weeks from a given site---from both control and manip---for which there are fewer than three observations in either control or manip as these lead to issues with calculating community similarity.
+
+Note that we cannot run the `adonis2` analysis using sample dates nested within sites as `strata`, because we need multiple samples within each strata, and we just have one sample per week. So this analysis has to be done at the `site` level.
+
+```{r community similarity pollinators}
+
+# 0. data prep; merge gross_ID categories
+# all Bombus together
+visitdat$newID = visitdat$gross_ID
+indexy = which(str_detect(visitdat$gross_ID, "Bombus"))
+visitdat$newID[indexy]="Bombus"
+# all Megachile together
+# note: doing Megachile before solitary, order matters
+indexy = which(str_detect(visitdat$gross_ID, "megachile"))
+visitdat$newID[indexy]="Megachile"
+# all solitary non-Megachile together
+indexy = which(str_detect(visitdat$gross_ID, "solitary"))
+visitdat$newID[indexy]="Solitary bee"
+# all butterflies
+indexy = which(str_detect(visitdat$gross_ID, "butterfly"))
+visitdat$newID[indexy]="Butterfly"
+# all unknowns (change capitalization)
+indexy = which(str_detect(visitdat$gross_ID, "unknown"))
+visitdat$newID[indexy]="Unknown"
+visitdat$newID = factor(visitdat$newID)
+
+# 0.5 remove site-weeks that have fewer than 3 obs in either control or manip
+# first find which ones meet that description:
+visit.assess <- visitdat %>%
+  group_by(site, plot, date) %>%
+  tally()
+
+indexy = which(visit.assess$n < 3)
+dates = unique(visit.assess$date[indexy])
+visitdat = visitdat %>% filter(!(date %in% dates))
+
+# # check to see that it worked--YES
+# # all values >= 3
+# visit.assess <- visitdat %>%
+#   group_by(site, plot, date) %>%
+#   tally()
+# which(visit.assess$n<3)
+
+rm(visit.assess, dates)
+
+# 1. create site-by-species matrix:
+# first create a weighted edge list 
+# plants in one col, pollinators in another, count in a third ("n"):
+dat.weighted <- visitdat %>%
+  group_by(site, plot, date, newID) %>%
+  tally()
+
+# convert weighted edge list into a network with `pivot_wider`:
+site.species.mat <- dat.weighted %>%
+  pivot_wider(id_cols = c("site", "plot", "date"), names_from = newID,
+              values_from = n,
+              values_fill = 0)
+
+# 2. calculate Morisita-Horn similarity
+morisita.poll = vegdist(site.species.mat[,-1:-3], method = "morisita")
+
+# 3. run `adonis2`
+poll.comm.sim = adonis2(morisita.poll ~ site.species.mat$plot, strata = site.species.mat$site, na.rm = TRUE, method = "morisita")
+print(poll.comm.sim)
+
+# clean
+rm(dat.weighted, poll.comm.sim, morisita.poll, site.species.mat)
+
+```
+No difference in community similarity of pollinators at the site level driven by snowmelt manipulation.
 
 ## Community Fecundity
 

@@ -86,7 +86,7 @@ four datasets to import:
 * seed data
     + most of the relevant data are included in here; 1155 rows in the original dataset
 * snowmelt data
-    + one data point per plot (16 plots, 8 sites each with a control and a snowmelt acceleration plot); data for Julian day on which meltout occurred and acceleration of the snowmelt plot relative to the control
+    + one data point per plot (16 plots, 8 sites each with a control and a snowmelt acceleration plot); data for day of year on which meltout occurred and acceleration of the snowmelt plot relative to the control
 * flowering phenology data
     + one data point per plot-species combination; 116 rows
     + data on how many weeks the flowering phenology in the snowmelt-accelerated plot was advanced relative to the control
@@ -396,7 +396,7 @@ The seed data generally fit a negative binomial distribution much better than a 
 
 #### Snowmelt plot
 
-Here's a plot of the Julian days that the snowmelt-accelerated plots melted out, with sites sorted by snowmelt day in the control plots:
+Here's a plot of the day of years that the snowmelt-accelerated plots melted out, with sites sorted by snowmelt day in the control plots:
 
 ```{r Plot meltout dates by plot, eval = T, echo = FALSE}
 
@@ -419,7 +419,7 @@ plotsnow = ggplot(snowmeltdat, aes(y=sitesort, x=meltday, group = site,
             arrow = arrow(angle = 30, length = unit(0.09, "inches"), 
                           ends = "first", type = "open")) + 
   theme_light() +
-  xlab("Julian day snow free") + ylab("sites") +
+  xlab("day of year snow free") + ylab("sites") +
   theme(axis.title.y = element_text(size = 10)) +
   theme(axis.text = element_text(size = 10)) +
   theme(strip.text.x = element_text(size = 12, colour = "black")) +
@@ -532,6 +532,10 @@ visitdat = visitdat %>% filter(gross_ID != "")
 
 # summarize by site-week
 visitdat.summ = visitdat %>% group_by(site, plot, date) %>% summarize(richness = n_distinct(gross_ID), abundance = n())
+
+## only if collapsing the gross_IDs into newIDs (as below for community composition)
+## if doing this need to collapse the gross_IDs first!
+# visitdat.summ = visitdat %>% group_by(site, plot, date) %>% summarize(richness = n_distinct(newID), abundance = n())
 
 # check to see if control and manip at each site were each sampled on the same day
 visit.check = visitdat.summ %>% group_by(date, site, plot) %>% summarize(n = n())
@@ -711,7 +715,7 @@ print(poll.comm.sim)
 rm(dat.weighted, poll.comm.sim, morisita.poll, site.species.mat)
 
 ```
-No difference in community similarity of pollinators at the site level driven by snowmelt manipulation.
+As hypothesized, no difference in community similarity of pollinators at the site level driven by snowmelt manipulation.
 
 ## Community Fecundity
 
@@ -1500,7 +1504,7 @@ rm(simoutpolllim, simoutpolllim24, poll.limit.mod.up,
 
 ```
 
-these do not look great (as with the models that included Lile and Mefu)---stick with the model with 2- and 3-way interactions.
+These do not look great (as with the models that included Lile and Mefu)---stick with the model with 2- and 3-way interactions.
 
 ### plots pollen limitation
 

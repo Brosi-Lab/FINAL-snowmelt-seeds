@@ -1225,7 +1225,7 @@ in a nutshell:
 
 ### updated models of community-wide pollen limitation
 
-After plotting these models (below), it is clear that the hand-pollination treatments did not work for `Mefu` or for `Lile`; instead, the hand-pollinated plants always produced fewer seeds than the open-pollinated plants in both treatment and control plots. Since it was our experimental manipulation of these plants that failed, it seems clear that we should remove those species from this analysis as they could obfuscate results. This will leave us unfortunately with only 3 species, but it still seems worth assessing those combined.
+After plotting these models (below), it is clear that the hand-pollination treatments did not work for `Mefu` or for `Lile`; instead, the hand-pollinated plants always produced fewer seeds than the open-pollinated plants in both treatment and control plots. Since it was our experimental manipulation of these plants that failed, we should remove those species from this analysis as they could obfuscate results. This leaves us unfortunately with only 3 species, but still very much worth assessing those combined.
 
 ```{r models of community-wide pollen limitation updated, warning = F, messages = F}
 
@@ -1787,7 +1787,7 @@ We interpret this to mean that our data should have one row for each plant indiv
 
 We originally tried with data agreggated such that there is one row per species per plot, but this threw an error about "insufficient within-choice set varianceError" and also probably better to have more granularity in the data, given that we can specify random effects.
 
-In these models, we want to use a slightly different dataset relative to those used in the community fecundity analyses. Here, we do *not* want to exclude site-species combinations for which there was no phenological advancement. The focal fixed effect is the snowmelt treatment, and the response is the proportion of seeds coming from the different plant species, so it is useful to the outcome if some species did not change their flowering time (i.e., phenological advancement) and others did. As before, we are not including the two sites for which the snowmelt acceleration did not change flowering phenology for any plant species.
+In these models, we want to use a slightly different dataset relative to those used in the community fecundity analyses. Here, we do *not* want to exclude site-species combinations for which there was no phenological advancement. The focal fixed effect is the snowmelt treatment, and the response is the proportion of seeds coming from the different plant species, so it is useful to know the outcome if some species did not change their flowering time (i.e., phenological advancement) and others did. As before, we are not including the two sites for which the snowmelt acceleration did not change flowering phenology for any plant species.
 
 In the data prep code chunk for the community fecundity models, we saved the data following the description above as `seedpropdat`, use that dataset here.
 
